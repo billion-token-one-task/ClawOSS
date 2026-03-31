@@ -194,7 +194,7 @@ for line in sys.stdin:
     metrics.append({
         'inputTokens': inp,
         'outputTokens': out,
-        'model': model or 'kimi-coding/k2p5',
+        'model': model or 'minimax/MiniMax-M2.7',
         'channel': sid
     })
 if metrics:

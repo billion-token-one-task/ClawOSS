@@ -1,0 +1,32 @@
+{
+  "version": "bootstrap-v1",
+  "status": "active",
+  "targeting": {
+    "prefer_trusted_repos": true,
+    "repo_health_weight": 0.25,
+    "merge_probability_weight": 0.35,
+    "expected_token_efficiency_weight": 0.2,
+    "novelty_weight": 0.1,
+    "followup_priority_weight": 0.1
+  },
+  "execution": {
+    "max_diff_lines_soft": 120,
+    "max_diff_lines_hard": 200,
+    "prefer_docs_test_bugfix_ratio": [0.35, 0.25, 0.4],
+    "max_parallel_impl": 8
+  },
+  "followup": {
+    "max_rounds": 3,
+    "stale_ping_hours": 72,
+    "merge_when_green": true
+  },
+  "budget": {
+    "daily_token_budget": 3000000,
+    "max_expected_tokens_per_attempt": 250000,
+    "min_expected_merge_prob": 0.3
+  },
+  "rollout": {
+    "mode": "stable",
+    "traffic_share": 1.0
+  }
+}

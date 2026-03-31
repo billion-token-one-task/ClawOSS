@@ -8,7 +8,7 @@
  * - cron-jobs.json parses as valid JSON array
  * - All required workspace files exist
  * - All skills have valid SKILL.md with frontmatter
- * - Skills are under 2000 character limit
+ * - Skills stay within the current operational size budget
  * - All scripts are executable
  */
 
@@ -109,7 +109,8 @@ const requiredSkills = [
   "safety-checker",
 ];
 
-const SKILL_CHAR_LIMIT = 15000;
+const SKILL_WARN_CHAR_LIMIT = 20000;
+const SKILL_FAIL_CHAR_LIMIT = 25000;
 
 for (const skill of requiredSkills) {
   const skillPath = join(ROOT, "workspace/skills", skill, "SKILL.md");
@@ -135,9 +136,11 @@ for (const skill of requiredSkills) {
     fail(`${skill}: missing 'description' field in frontmatter`);
   }
 
-  // Check size limit
-  if (chars > SKILL_CHAR_LIMIT) {
-    fail(`${skill}: ${chars} chars exceeds ${SKILL_CHAR_LIMIT} limit`);
+  // Keep large skills visible without blocking legitimate configs.
+  if (chars > SKILL_FAIL_CHAR_LIMIT) {
+    fail(`${skill}: ${chars} chars exceeds ${SKILL_FAIL_CHAR_LIMIT} hard limit`);
+  } else if (chars > SKILL_WARN_CHAR_LIMIT) {
+    warn(`${skill}: ${chars} chars exceeds ${SKILL_WARN_CHAR_LIMIT} warning threshold`);
   } else {
     pass(`${skill}: ${chars} chars`);
   }

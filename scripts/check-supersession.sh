@@ -5,11 +5,21 @@
 
 REPO="${1:?Usage: check-supersession.sh <owner/repo> <issue_number>}"
 ISSUE="${2:?Usage: check-supersession.sh <owner/repo> <issue_number>}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+RECORD_DECISIONS="${CLAWOSS_RECORD_DECISIONS:-0}"
 
 # 1. Linked open PRs
 LINKED=$(gh api "repos/${REPO}/issues/${ISSUE}/timeline" --jq '[.[] | select(.event=="cross-referenced") | .source.issue | select(.pull_request != null and .state == "open")] | length' 2>/dev/null || echo 0)
 [[ "$LINKED" =~ ^[0-9]+$ ]] || LINKED=0
 if [ "$LINKED" -gt 0 ]; then
+  if [ "$RECORD_DECISIONS" = "1" ]; then
+    bash "$SCRIPT_DIR/record-decision.sh" issue_guardrail \
+      --repo "$REPO" \
+      --issue "$ISSUE" \
+      --selected false \
+      --reasoning-summary "${LINKED} open PR(s) already linked" \
+      --metadata-json '{"reason":"superseded"}' >/dev/null 2>&1 || true
+  fi
   echo "{\"superseded\": true, \"repo\": \"$REPO\", \"issue\": $ISSUE, \"reason\": \"${LINKED} open PR(s) already linked\"}"
   exit 1
 fi
@@ -21,6 +31,14 @@ if echo "$ASSIGNEES" | grep -q "message"; then
   ASSIGNEES=""
 fi
 if [ -n "$ASSIGNEES" ]; then
+  if [ "$RECORD_DECISIONS" = "1" ]; then
+    bash "$SCRIPT_DIR/record-decision.sh" issue_guardrail \
+      --repo "$REPO" \
+      --issue "$ISSUE" \
+      --selected false \
+      --reasoning-summary "assigned to: $ASSIGNEES" \
+      --metadata-json '{"reason":"assigned"}' >/dev/null 2>&1 || true
+  fi
   python3 -c "import json,sys; print(json.dumps({'superseded': True, 'repo': sys.argv[1], 'issue': int(sys.argv[2]), 'reason': 'assigned to: ' + sys.argv[3]}))" "$REPO" "$ISSUE" "$ASSIGNEES"
   exit 1
 fi
@@ -29,6 +47,14 @@ fi
 CLAIMED=$(gh api "repos/${REPO}/issues/${ISSUE}/comments" --jq '[.[] | select(.body | test("I.ll take|I.m working|I will fix|working on a fix"; "i"))] | length' 2>/dev/null || echo 0)
 [[ "$CLAIMED" =~ ^[0-9]+$ ]] || CLAIMED=0
 if [ "$CLAIMED" -gt 0 ]; then
+  if [ "$RECORD_DECISIONS" = "1" ]; then
+    bash "$SCRIPT_DIR/record-decision.sh" issue_guardrail \
+      --repo "$REPO" \
+      --issue "$ISSUE" \
+      --selected false \
+      --reasoning-summary "someone claimed this in comments" \
+      --metadata-json '{"reason":"claimed"}' >/dev/null 2>&1 || true
+  fi
   echo "{\"superseded\": true, \"repo\": \"$REPO\", \"issue\": $ISSUE, \"reason\": \"someone claimed this in comments\"}"
   exit 1
 fi
@@ -37,6 +63,14 @@ fi
 COMPETING=$(gh pr list --repo "$REPO" --state open --search "$ISSUE" --json number,author --jq '[.[] | select(.author.login != "BillionClaw")] | length' 2>/dev/null || echo 0)
 [[ "$COMPETING" =~ ^[0-9]+$ ]] || COMPETING=0
 if [ "$COMPETING" -gt 0 ]; then
+  if [ "$RECORD_DECISIONS" = "1" ]; then
+    bash "$SCRIPT_DIR/record-decision.sh" issue_guardrail \
+      --repo "$REPO" \
+      --issue "$ISSUE" \
+      --selected false \
+      --reasoning-summary "${COMPETING} competing PR(s)" \
+      --metadata-json '{"reason":"competing_pr"}' >/dev/null 2>&1 || true
+  fi
   echo "{\"superseded\": true, \"repo\": \"$REPO\", \"issue\": $ISSUE, \"reason\": \"${COMPETING} competing PR(s)\"}"
   exit 1
 fi

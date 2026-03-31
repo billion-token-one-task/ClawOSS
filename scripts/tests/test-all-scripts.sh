@@ -6,8 +6,13 @@ set -u
 
 PASSED=0
 FAILED=0
-SCRIPTS="/Users/kevinlin/clawOSS/scripts"
-MEMORY="/Users/kevinlin/clawOSS/workspace/memory"
+SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"
+TEST_PROJECT="$(mktemp -d)"
+MEMORY="$TEST_PROJECT/workspace/memory"
+
+trap 'rm -rf "$TEST_PROJECT"' EXIT
+
+bash "$SCRIPTS/init-workspace-state.sh" >/dev/null 2>&1
 
 pass() { echo "  ✅ $1"; PASSED=$((PASSED + 1)); }
 fail() { echo "  ❌ $1"; FAILED=$((FAILED + 1)); }
@@ -29,18 +34,18 @@ echo ""
 
 # ── cleanup-stale-sessions.sh ─────────────────────────────────────
 echo "Test: cleanup-stale-sessions.sh"
-OUT=$(bash "$SCRIPTS/cleanup-stale-sessions.sh" 2>&1)
+OUT=$(WORKSPACE_DIR="$TEST_PROJECT/workspace" bash "$SCRIPTS/cleanup-stale-sessions.sh" 2>&1)
 assert_valid_json "$OUT" "Returns valid JSON"
 assert_contains "$OUT" "stale_locks_removed" "Has stale_locks_removed field"
 assert_contains "$OUT" "spawned_pending_reset" "Has spawned_pending_reset field"
 # Verify NO "integer expression" error
-ERR=$(bash "$SCRIPTS/cleanup-stale-sessions.sh" 2>&1 >/dev/null)
+ERR=$(WORKSPACE_DIR="$TEST_PROJECT/workspace" bash "$SCRIPTS/cleanup-stale-sessions.sh" 2>&1 >/dev/null)
 echo "$ERR" | grep -q "integer expression" && fail "Still has integer expression error" || pass "No integer expression error"
 
 # ── heartbeat-status.sh ───────────────────────────────────────────
 echo ""
 echo "Test: heartbeat-status.sh"
-OUT=$(bash "$SCRIPTS/heartbeat-status.sh" 2>&1)
+OUT=$(PROJECT_DIR="$TEST_PROJECT" bash "$SCRIPTS/heartbeat-status.sh" 2>&1)
 assert_valid_json "$OUT" "Returns valid JSON"
 assert_contains "$OUT" "consecutive_wakes" "Has consecutive_wakes"
 assert_contains "$OUT" "open_prs" "Has open_prs"
@@ -57,7 +62,7 @@ assert isinstance(d['queue_depth'], int), 'queue not int'
 echo ""
 echo "Test: check-blocklist.sh"
 # Non-blocked repo
-OUT=$(bash "$SCRIPTS/check-blocklist.sh" "DioCrafts/OxiCloud" 2>&1)
+OUT=$(PROJECT_DIR="$TEST_PROJECT" bash "$SCRIPTS/check-blocklist.sh" "DioCrafts/OxiCloud" 2>&1)
 assert_valid_json "$OUT" "Non-blocked repo returns valid JSON"
 assert_contains "$OUT" '"blocked": false' "Non-blocked repo shows false"
 
@@ -67,7 +72,7 @@ EC=$?
 [ "$EC" -ne 0 ] && pass "Missing arg returns non-zero exit" || fail "Missing arg should fail"
 
 # Repo with special chars
-OUT=$(bash "$SCRIPTS/check-blocklist.sh" "owner/repo-with-dashes" 2>&1)
+OUT=$(PROJECT_DIR="$TEST_PROJECT" bash "$SCRIPTS/check-blocklist.sh" "owner/repo-with-dashes" 2>&1)
 assert_valid_json "$OUT" "Repo with dashes returns valid JSON"
 
 # ── check-already-fixed.sh ────────────────────────────────────────
@@ -92,17 +97,17 @@ assert_contains "$OUT" "superseded" "Has superseded field"
 # ── lock-repo.sh + unlock-repo.sh ─────────────────────────────────
 echo ""
 echo "Test: lock-repo.sh + unlock-repo.sh"
-OUT=$(bash "$SCRIPTS/lock-repo.sh" "test-unit/test-repo" "12345" 2>&1)
+OUT=$(PROJECT_DIR="$TEST_PROJECT" bash "$SCRIPTS/lock-repo.sh" "test-unit/test-repo" "12345" 2>&1)
 assert_valid_json "$OUT" "Lock returns valid JSON"
 assert_contains "$OUT" '"locked": true' "Lock shows true"
 [ -f "$MEMORY/locks/test-unit_test-repo.lock" ] && pass "Lock file created" || fail "Lock file not created"
 
-OUT=$(bash "$SCRIPTS/unlock-repo.sh" "test-unit/test-repo" 2>&1)
+OUT=$(PROJECT_DIR="$TEST_PROJECT" bash "$SCRIPTS/unlock-repo.sh" "test-unit/test-repo" 2>&1)
 assert_valid_json "$OUT" "Unlock returns valid JSON"
 [ ! -f "$MEMORY/locks/test-unit_test-repo.lock" ] && pass "Lock file removed" || fail "Lock file still exists"
 
 # Double unlock (should not error)
-OUT=$(bash "$SCRIPTS/unlock-repo.sh" "test-unit/test-repo" 2>&1)
+OUT=$(PROJECT_DIR="$TEST_PROJECT" bash "$SCRIPTS/unlock-repo.sh" "test-unit/test-repo" 2>&1)
 assert_valid_json "$OUT" "Double unlock returns valid JSON (no error)"
 
 # ── sign-cla.sh ───────────────────────────────────────────────────

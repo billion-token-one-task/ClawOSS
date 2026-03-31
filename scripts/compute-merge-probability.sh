@@ -6,8 +6,12 @@
 
 REPO="${1:?Usage: compute-merge-probability.sh <owner/repo> <issue_number> [--type TYPE]}"
 ISSUE="${2:?Usage: compute-merge-probability.sh <owner/repo> <issue_number>}"
-PROJECT_DIR="${PROJECT_DIR:-/Users/kevinlin/clawOSS}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+. "$SCRIPT_DIR/lib/path-helpers.sh"
+
+PROJECT_DIR="$(clawoss_resolve_project_dir "$0")"
 TYPE="fix"
+RECORD_DECISIONS="${CLAWOSS_RECORD_DECISIONS:-0}"
 
 shift 2
 while [ $# -gt 0 ]; do
@@ -19,6 +23,17 @@ done
 
 OWNER="${REPO%%/*}"
 REPO_NAME="${REPO##*/}"
+
+extract_section() {
+  local heading="$1"
+  local file="$2"
+
+  awk -v heading="$heading" '
+    $0 == heading { in_section=1; next }
+    /^## / && in_section { exit }
+    in_section { print }
+  ' "$file"
+}
 
 # Weights: 15% task_type + 20% size + 15% responsiveness + 25% trust + 10% freshness + 10% contributor_fit + 5% competition
 W_TYPE=15 W_SIZE=20 W_RESPONSIVE=15 W_TRUST=25 W_FRESH=10 W_FIT=10 W_COMP=5
@@ -59,13 +74,13 @@ fi
 TRUST_FILE="$PROJECT_DIR/workspace/memory/trust-repos.md"
 S_TRUST=50
 if [ -f "$TRUST_FILE" ]; then
-  TRUST_LINE=$(awk '/^## Active/,/^## /' "$TRUST_FILE" | grep -i "${OWNER}/${REPO_NAME}" || true)
+  TRUST_LINE=$(extract_section "## Active" "$TRUST_FILE" | grep -iF "${OWNER}/${REPO_NAME}" || true)
   if [ -n "$TRUST_LINE" ]; then
     TRUST_VAL=$(echo "$TRUST_LINE" | grep -oE '\| *[0-9]+(\.[0-9]+)? *\|' | head -1 | grep -oE '[0-9]+' | head -1)
     S_TRUST=$(( ${TRUST_VAL:-7} * 10 ))
     [ "$S_TRUST" -gt 100 ] && S_TRUST=100
   fi
-  DEPRI=$(awk '/^## Deprioritized/,/^## /' "$TRUST_FILE" | grep -i "${OWNER}/${REPO_NAME}" || true)
+  DEPRI=$(extract_section "## Deprioritized" "$TRUST_FILE" | grep -iF "${OWNER}/${REPO_NAME}" || true)
   [ -n "$DEPRI" ] && S_TRUST=5
 fi
 
@@ -121,4 +136,17 @@ cat <<ENDJSON
   "recommendation": $(python3 -c "s=$SCORE; print('\"strong_yes\"' if s>=75 else '\"yes\"' if s>=55 else '\"maybe\"' if s>=35 else '\"skip\"')" 2>/dev/null || echo '"unknown"')
 }
 ENDJSON
+
+if [ "$RECORD_DECISIONS" = "1" ]; then
+  SELECTED=false
+  python3 -c "import sys; sys.exit(0 if float(sys.argv[1]) >= 55 else 1)" "$SCORE" 2>/dev/null && SELECTED=true || true
+  bash "$SCRIPT_DIR/record-decision.sh" issue_score \
+    --repo "$REPO" \
+    --issue "$ISSUE" \
+    --selected "$SELECTED" \
+    --score "$SCORE" \
+    --expected-merge-prob "$(python3 -c "print(round(${SCORE}/100, 4))" 2>/dev/null || echo 0)" \
+    --reasoning-summary "merge probability computed for ${TYPE} issue" \
+    --metadata-json "{\"type\": $(echo "$TYPE" | jq -R .), \"recommendation\": $(python3 -c "s=$SCORE; print('\"strong_yes\"' if s>=75 else '\"yes\"' if s>=55 else '\"maybe\"' if s>=35 else '\"skip\"')" 2>/dev/null || echo '"unknown"')}" >/dev/null 2>&1 || true
+fi
 exit 0

@@ -5,11 +5,15 @@
   "description": "The best OpenClaw agent configuration for autonomous OSS development",
   "workspaces": ["dashboard"],
   "scripts": {
+    "alpha:deploy": "bash scripts/deploy-alpha.sh",
+    "alpha:upgrade": "bash scripts/upgrade-alpha.sh",
+    "doctor": "bash scripts/doctor.sh",
     "setup": "bash scripts/setup.sh",
     "start": "bash scripts/start.sh",
     "stop": "bash scripts/stop.sh",
     "restart": "bash scripts/restart.sh",
     "health": "bash scripts/health-check.sh",
+    "test": "bash scripts/tests/run-all-tests.sh && bash scripts/tests/test-all-scripts.sh && bash scripts/tests/test-portability.sh && bash scripts/tests/test-doctor.sh && bash scripts/tests/test-autonomy-backend.sh && bash scripts/tests/test-alpha-lifecycle.sh && bash scripts/tests/test-alpha-gate.sh && bash scripts/tests/test-restart-smoke.sh",
     "dashboard:dev": "cd dashboard && npm run dev",
     "dashboard:build": "cd dashboard && npm run build",
     "validate": "node scripts/validate-config.mjs"

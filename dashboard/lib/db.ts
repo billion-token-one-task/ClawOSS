@@ -119,6 +119,46 @@ async function initSchema(): Promise<void> {
       prompt_gaps INTEGER, metadata TEXT
     )`,
     `CREATE INDEX IF NOT EXISTS idx_autonomy_ts ON autonomy_snapshots(timestamp DESC)`,
+    `CREATE TABLE IF NOT EXISTS decision_events (
+      id TEXT PRIMARY KEY, timestamp INTEGER NOT NULL,
+      session_id TEXT, stage TEXT NOT NULL,
+      strategy_version TEXT, repo TEXT,
+      issue_number INTEGER, pr_number INTEGER,
+      selected INTEGER DEFAULT 0, score REAL,
+      confidence REAL, expected_merge_prob REAL,
+      expected_token_cost INTEGER, reasoning_summary TEXT,
+      candidate_set TEXT, metadata TEXT
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_decision_ts ON decision_events(timestamp DESC)`,
+    `CREATE INDEX IF NOT EXISTS idx_decision_stage ON decision_events(stage, timestamp DESC)`,
+    `CREATE TABLE IF NOT EXISTS execution_outcomes (
+      id TEXT PRIMARY KEY, timestamp INTEGER NOT NULL,
+      decision_id TEXT, strategy_version TEXT,
+      repo TEXT, issue_number INTEGER, pr_number INTEGER,
+      outcome TEXT NOT NULL, time_to_first_review_hours REAL,
+      time_to_merge_hours REAL, token_cost REAL,
+      input_tokens INTEGER, output_tokens INTEGER,
+      failure_category TEXT, metadata TEXT
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_outcome_ts ON execution_outcomes(timestamp DESC)`,
+    `CREATE INDEX IF NOT EXISTS idx_outcome_strategy ON execution_outcomes(strategy_version, timestamp DESC)`,
+    `CREATE TABLE IF NOT EXISTS reflections (
+      id TEXT PRIMARY KEY, timestamp INTEGER NOT NULL,
+      scope TEXT NOT NULL, strategy_version TEXT,
+      source_window_start INTEGER, source_window_end INTEGER,
+      summary TEXT NOT NULL, insights TEXT,
+      recommended_changes TEXT, confidence REAL,
+      applied INTEGER DEFAULT 0, metadata TEXT
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_reflections_ts ON reflections(timestamp DESC)`,
+    `CREATE TABLE IF NOT EXISTS strategy_versions (
+      id TEXT PRIMARY KEY, created_at INTEGER NOT NULL,
+      parent_version TEXT, status TEXT NOT NULL,
+      author_type TEXT NOT NULL, config TEXT NOT NULL,
+      evaluation TEXT, metadata TEXT
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_strategy_created ON strategy_versions(created_at DESC)`,
+    `CREATE INDEX IF NOT EXISTS idx_strategy_status ON strategy_versions(status, created_at DESC)`,
   ];
 
   for (const stmt of statements) {

@@ -158,3 +158,66 @@ export const autonomySnapshots = sqliteTable("autonomy_snapshots", {
   promptGaps: integer("prompt_gaps"),
   metadata: text("metadata", { mode: "json" }),
 });
+
+export const decisionEvents = sqliteTable("decision_events", {
+  id: text("id").primaryKey(),
+  timestamp: integer("timestamp", { mode: "timestamp" }).notNull(),
+  sessionId: text("session_id"),
+  stage: text("stage").notNull(),
+  strategyVersion: text("strategy_version"),
+  repo: text("repo"),
+  issueNumber: integer("issue_number"),
+  prNumber: integer("pr_number"),
+  selected: integer("selected", { mode: "boolean" }).default(false),
+  score: real("score"),
+  confidence: real("confidence"),
+  expectedMergeProb: real("expected_merge_prob"),
+  expectedTokenCost: integer("expected_token_cost"),
+  reasoningSummary: text("reasoning_summary"),
+  candidateSet: text("candidate_set", { mode: "json" }),
+  metadata: text("metadata", { mode: "json" }),
+});
+
+export const executionOutcomes = sqliteTable("execution_outcomes", {
+  id: text("id").primaryKey(),
+  timestamp: integer("timestamp", { mode: "timestamp" }).notNull(),
+  decisionId: text("decision_id"),
+  strategyVersion: text("strategy_version"),
+  repo: text("repo"),
+  issueNumber: integer("issue_number"),
+  prNumber: integer("pr_number"),
+  outcome: text("outcome").notNull(),
+  timeToFirstReviewHours: real("time_to_first_review_hours"),
+  timeToMergeHours: real("time_to_merge_hours"),
+  tokenCost: real("token_cost"),
+  inputTokens: integer("input_tokens"),
+  outputTokens: integer("output_tokens"),
+  failureCategory: text("failure_category"),
+  metadata: text("metadata", { mode: "json" }),
+});
+
+export const reflections = sqliteTable("reflections", {
+  id: text("id").primaryKey(),
+  timestamp: integer("timestamp", { mode: "timestamp" }).notNull(),
+  scope: text("scope").notNull(),
+  strategyVersion: text("strategy_version"),
+  sourceWindowStart: integer("source_window_start", { mode: "timestamp" }),
+  sourceWindowEnd: integer("source_window_end", { mode: "timestamp" }),
+  summary: text("summary").notNull(),
+  insights: text("insights", { mode: "json" }),
+  recommendedChanges: text("recommended_changes", { mode: "json" }),
+  confidence: real("confidence"),
+  applied: integer("applied", { mode: "boolean" }).default(false),
+  metadata: text("metadata", { mode: "json" }),
+});
+
+export const strategyVersions = sqliteTable("strategy_versions", {
+  id: text("id").primaryKey(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  parentVersion: text("parent_version"),
+  status: text("status").notNull(),
+  authorType: text("author_type").notNull(),
+  config: text("config", { mode: "json" }).notNull(),
+  evaluation: text("evaluation", { mode: "json" }),
+  metadata: text("metadata", { mode: "json" }),
+});

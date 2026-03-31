@@ -16,7 +16,7 @@ attachments: [trust-repos.md, pr-ledger.md]
 ## CRITICAL: Script Path
 **EVERY bash block MUST start with this line:**
 ```bash
-SCRIPTS=/Users/kevinlin/clawOSS/scripts
+SCRIPTS=$CLAWOSS_ROOT/scripts
 ```
 All ClawOSS utility scripts are at this absolute path. You run in /tmp — relative paths WILL NOT WORK.
 
@@ -43,7 +43,7 @@ Your ONLY job is to find repos and issues worth targeting. You do NOT write code
 
 ### Setup
 ```bash
-SCRIPTS=/Users/kevinlin/clawOSS/scripts
+SCRIPTS=$CLAWOSS_ROOT/scripts
 ```
 
 ### Operating Loop
@@ -101,7 +101,7 @@ gh api "/search/issues?q=is:issue+is:open+label:good-first-issue+stars:>200+crea
 For each promising repo (score >= 8 before direction analysis), run the direction analysis script:
 
 ```bash
-SCRIPTS=/Users/kevinlin/clawOSS/scripts
+SCRIPTS=$CLAWOSS_ROOT/scripts
 DIRECTION=$(bash $SCRIPTS/analyze-repo-direction.sh {owner}/{repo})
 echo "$DIRECTION" | python3 -c "
 import json,sys; d=json.load(sys.stdin)
@@ -180,11 +180,31 @@ The script computes weighted score: 15% task_type + 20% size + 15% responsivenes
 **Threshold**: P(merge) >= 30 to enter staging. Sort staging by P(merge) descending.
 Mark candidates with P(merge) >= 60 as `priority: high`.
 
+Before writing the final top candidates to staging, capture the candidate set for later reflection:
+```bash
+bash $SCRIPTS/record-decision.sh scout_cycle \
+  --selected false \
+  --candidate-set-json "$(bash $SCRIPTS/queue-candidates-to-json.sh $CLAWOSS_ROOT/workspace/memory/work-queue-staging.md 2>/dev/null || echo '[]')" \
+  --reasoning-summary "scout finished scoring the current cycle candidate set" \
+  --metadata-json '{"source":"scout","phase":"pre_write"}'
+```
+
 ### Step 5: Write to Staging Queue
 
 Append scored candidates to `memory/work-queue-staging.md` (sorted by P(merge) descending):
 ```markdown
 - [{score}] P({p_merge}) {owner}/{repo}#{number}: {title} | type:{bug/docs/typo/test} | created:{date} | direction_aligned:{yes/no} | priority:{high/normal}
+```
+
+After appending, record the best candidate from this cycle:
+```bash
+TOP=$(bash $SCRIPTS/queue-candidates-to-json.sh $CLAWOSS_ROOT/workspace/memory/work-queue-staging.md | jq -r 'sort_by(-(.expectedMergeProb // 0)) | .[0] | "\(.repo) \(.issue)"' 2>/dev/null || echo "")
+if [ -n "$TOP" ]; then
+  bash $SCRIPTS/record-queue-pick.sh $CLAWOSS_ROOT/workspace/memory/work-queue-staging.md $(echo "$TOP" | awk '{print $1}') $(echo "$TOP" | awk '{print $2}') \
+    --stage scout_rank \
+    --selected true \
+    --reasoning-summary "scout ranked this candidate highest in the current cycle"
+fi
 ```
 
 Also write per-repo reports to `memory/repos/{owner}_{repo}.md` (health data, scored issues).

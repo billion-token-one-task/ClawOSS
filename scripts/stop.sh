@@ -4,7 +4,9 @@ set -euo pipefail
 echo "=== Stopping ClawOSS ==="
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+. "$SCRIPT_DIR/lib/path-helpers.sh"
+
+PROJECT_DIR="$(clawoss_resolve_project_dir "$0")"
 
 # Remove ClawOSS cron jobs (don't stop the gateway — other agents may be running)
 echo "Removing ClawOSS cron jobs..."
@@ -14,8 +16,8 @@ done < <(jq -r '.[].id' "$PROJECT_DIR/config/cron-jobs.json")
 
 # Stop PR ledger sync
 PLIST="$HOME/Library/LaunchAgents/com.clawoss.pr-ledger-sync.plist"
-if [ -f "$PLIST" ]; then
-    launchctl unload "$PLIST" 2>/dev/null && echo "  Stopped PR ledger sync" || true
+if clawoss_is_macos && [ -f "$PLIST" ]; then
+  launchctl unload "$PLIST" 2>/dev/null && echo "  Stopped PR ledger sync" || true
 fi
 
 # Stop dashboard sync

@@ -6,6 +6,12 @@
 
 set -u
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+. "$SCRIPT_DIR/lib/path-helpers.sh"
+
+PROJECT_DIR="$(clawoss_resolve_project_dir "$0")"
+TMP_ROOT="$(clawoss_temp_root)"
+
 INTERVAL=300  # 5 minutes
 MAX_AGE=30    # minutes of inactivity before deletion
 PID_FILE="/tmp/clawoss-cleaner.pid"
@@ -31,7 +37,7 @@ cleanup_cycle() {
         rm -rf "$dir" 2>/dev/null
         freed=$((freed + size))
         count=$((count + 1))
-    done < <(find /private/tmp -maxdepth 1 -name "clawoss-*" -type d -mmin +${MAX_AGE} 2>/dev/null)
+    done < <(find "$TMP_ROOT" -maxdepth 1 -name "clawoss-*" -type d -mmin +${MAX_AGE} 2>/dev/null)
 
     # 2. Clean escaped repos — subagents that cloned outside the clawoss- prefix
     #    Detect by: /tmp/{name}/.git exists AND dir is >30 min inactive
@@ -49,7 +55,7 @@ cleanup_cycle() {
             freed=$((freed + size))
             count=$((count + 1))
         fi
-    done < <(find /private/tmp -maxdepth 2 -name ".git" -type d -not -path "/private/tmp/openclaw/*" 2>/dev/null)
+    done < <(find "$TMP_ROOT" -maxdepth 2 -name ".git" -type d -not -path "$TMP_ROOT/openclaw/*" 2>/dev/null)
 
     # 3. Clean known escapee patterns (repos cloned to /tmp/{repo-name}/)
     for pattern in eliza copilotkit-* rig unsloth* fastapi libminizinc notebooks-check; do
@@ -62,22 +68,22 @@ cleanup_cycle() {
                 freed=$((freed + size))
                 count=$((count + 1))
             fi
-        done < <(find /private/tmp -maxdepth 1 -name "$pattern" -type d 2>/dev/null)
+        done < <(find "$TMP_ROOT" -maxdepth 1 -name "$pattern" -type d 2>/dev/null)
     done
 
     # 4. Clean large stray files (downloaded wheels, binaries, etc.)
-    find /private/tmp -maxdepth 1 -name "*.whl" -mmin +${MAX_AGE} -delete 2>/dev/null
-    find /private/tmp -maxdepth 1 -name "*.tar.gz" -size +50M -mmin +${MAX_AGE} -delete 2>/dev/null
-    find /private/tmp -maxdepth 1 -name "*.zip" -size +50M -mmin +${MAX_AGE} -delete 2>/dev/null
+    find "$TMP_ROOT" -maxdepth 1 -name "*.whl" -mmin +${MAX_AGE} -delete 2>/dev/null
+    find "$TMP_ROOT" -maxdepth 1 -name "*.tar.gz" -size +50M -mmin +${MAX_AGE} -delete 2>/dev/null
+    find "$TMP_ROOT" -maxdepth 1 -name "*.zip" -size +50M -mmin +${MAX_AGE} -delete 2>/dev/null
     # Clean old issue-scout event files (90k each, hundreds accumulate)
-    find /private/tmp -maxdepth 1 -name "issue-scout-evt-*.json" -mmin +${MAX_AGE} -delete 2>/dev/null
+    find "$TMP_ROOT" -maxdepth 1 -name "issue-scout-evt-*.json" -mmin +${MAX_AGE} -delete 2>/dev/null
     # Clean old debug/test files from subagents
-    find /private/tmp -maxdepth 1 -name "debug_*.py" -mmin +${MAX_AGE} -delete 2>/dev/null
-    find /private/tmp -maxdepth 1 -name "test_*.py" -mmin +${MAX_AGE} -delete 2>/dev/null
-    find /private/tmp -maxdepth 1 -name "test_*.rs" -mmin +${MAX_AGE} -delete 2>/dev/null
+    find "$TMP_ROOT" -maxdepth 1 -name "debug_*.py" -mmin +${MAX_AGE} -delete 2>/dev/null
+    find "$TMP_ROOT" -maxdepth 1 -name "test_*.py" -mmin +${MAX_AGE} -delete 2>/dev/null
+    find "$TMP_ROOT" -maxdepth 1 -name "test_*.rs" -mmin +${MAX_AGE} -delete 2>/dev/null
 
     # 5. Clean workspace/repos/ and workspace/workdir/ if >100MB
-    for wsdir in /Users/kevinlin/clawOSS/workspace/repos /Users/kevinlin/clawOSS/workspace/workdir; do
+    for wsdir in "$PROJECT_DIR/workspace/repos" "$PROJECT_DIR/workspace/workdir"; do
         if [ -d "$wsdir" ]; then
             ws_size=$(du -sm "$wsdir" 2>/dev/null | cut -f1)
             if [ "${ws_size:-0}" -gt 100 ]; then

@@ -19,7 +19,7 @@ runTimeoutSeconds: 0
 ## CRITICAL: Script Path
 **EVERY bash block MUST start with this line:**
 ```bash
-SCRIPTS=/Users/kevinlin/clawOSS/scripts
+SCRIPTS=$CLAWOSS_ROOT/scripts
 ```
 All ClawOSS utility scripts are at this absolute path. You run in /tmp — relative paths WILL NOT WORK.
 
@@ -54,7 +54,7 @@ WHILE context < 70%:
 ### Step 1+2: Fetch All Open PRs
 
 ```bash
-SCRIPTS=/Users/kevinlin/clawOSS/scripts
+SCRIPTS=$CLAWOSS_ROOT/scripts
 # Fetch all open PRs
 ALL_PRS=$(gh search prs --author BillionClaw --state open --limit 50 --json repository,number,title,url,updatedAt)
 

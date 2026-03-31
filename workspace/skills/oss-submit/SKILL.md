@@ -44,9 +44,20 @@ This prevents the 5x-duplicate-on-instructor and 3x-duplicate-on-taskcoach incid
 
 ## Process
 1. Push branch to fork (or origin if write access)
-2. **Verify target branch:** `gh api repos/{owner}/{repo} --jq '.default_branch'` — create PR against THIS branch, not hardcoded 'main' or 'master'. Wrong target = instant close.
-3. **PR template check:** `ls .github/PULL_REQUEST_TEMPLATE.md .github/PULL_REQUEST_TEMPLATE/ 2>/dev/null` — if a template exists, use its structure (fill in sections, check checkboxes). If not, use our format below.
-4. Create PR using `gh pr create --base $DEFAULT_BRANCH`:
+2. Alpha human gate (mandatory before `gh pr create`):
+   ```bash
+   DIFF_LINES=$(git diff --shortstat HEAD~1..HEAD 2>/dev/null | awk '{add+=$4; del+=$6} END {print add+del+0}')
+   bash "$CLAWOSS_ROOT/scripts/evaluate-alpha-gate.sh" pr_submit \
+     --repo OWNER/REPO \
+     --pr-type {bugfix|docs|typo|test} \
+     --diff-lines "${DIFF_LINES:-0}" \
+     --reasoning-summary "ready to submit after local verification" \
+     --record
+   ```
+   If decision is `review`, STOP and leave the PR in local branch state for human approval.
+3. **Verify target branch:** `gh api repos/{owner}/{repo} --jq '.default_branch'` — create PR against THIS branch, not hardcoded 'main' or 'master'. Wrong target = instant close.
+4. **PR template check:** `ls .github/PULL_REQUEST_TEMPLATE.md .github/PULL_REQUEST_TEMPLATE/ 2>/dev/null` — if a template exists, use its structure (fill in sections, check checkboxes). If not, use our format below.
+5. Create PR using `gh pr create --base $DEFAULT_BRANCH`:
    - Title: `{type}(scope): description` following Conventional Commits — type must match contribution
    - Body: write like a developer, not an AI. Be terse (3-5 sentences). No filler.
      - **AI tells (NEVER USE)**: "This PR addresses...", "I noticed...", "Upon investigation...",
@@ -80,7 +91,7 @@ This prevents the 5x-duplicate-on-instructor and 3x-duplicate-on-taskcoach incid
    - **Docs/typo fixes**: what was wrong + what's correct now (2-3 sentences total)
    - **Test additions**: what's tested + why it matters (2-3 sentences total)
    - References: "Fixes #<issue-number>" in body
-5. Do NOT mention CLA in PR body. If repo requires CLA, it will be handled separately.
+6. Do NOT mention CLA in PR body. If repo requires CLA, it will be handled separately.
 7. Log submission to memory: repo, issue, PR number, timestamp, contribution type
 8. Report to dashboard via dashboard-reporter skill
 

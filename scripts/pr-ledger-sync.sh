@@ -11,10 +11,12 @@ set -euo pipefail
 # Idempotent — safe to run repeatedly.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+. "$SCRIPT_DIR/lib/path-helpers.sh"
+PROJECT_DIR="$(clawoss_resolve_project_dir "$0")"
 LEDGER="$PROJECT_DIR/workspace/memory/pr-ledger.md"
 RESULT_DIR="$PROJECT_DIR/workspace/memory"
 AGENT_USER="${CLAW_AGENT_USERNAME:-BillionClaw}"
+RECORD_OUTCOMES="${CLAWOSS_RECORD_OUTCOMES:-0}"
 
 log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] pr-ledger-sync: $*"; }
 
@@ -62,6 +64,52 @@ prs.append({
 })
 json.dump(prs, sys.stdout)
 " 2>/dev/null)
+
+    if [ "$RECORD_OUTCOMES" = "1" ]; then
+        BASENAME=$(basename "$f" .md)
+        RESULT_JSON=$(_RESULT_FILE="$f" python3 - <<'PY'
+import json, os, re
+path = os.environ['_RESULT_FILE']
+with open(path, 'r', encoding='utf-8') as f:
+    text = f.read()
+if not text.startswith('---'):
+    print('{}')
+    raise SystemExit(0)
+parts = text.split('---', 2)
+if len(parts) < 3:
+    print('{}')
+    raise SystemExit(0)
+frontmatter = {}
+for line in parts[1].splitlines():
+    if ':' not in line:
+        continue
+    key, value = line.split(':', 1)
+    frontmatter[key.strip()] = value.strip()
+print(json.dumps(frontmatter))
+PY
+)
+        STATUS=$(echo "$RESULT_JSON" | jq -r '.status // empty' 2>/dev/null || true)
+        TYPE=$(echo "$RESULT_JSON" | jq -r '.type // "implementation"' 2>/dev/null || echo "implementation")
+        FAILURE_REASON=$(echo "$RESULT_JSON" | jq -r '.failure_reason // empty' 2>/dev/null || true)
+        FILES_CHANGED=$(echo "$RESULT_JSON" | jq -r '.files_changed // empty' 2>/dev/null || true)
+        ADDITIONS=$(echo "$RESULT_JSON" | jq -r '.additions // empty' 2>/dev/null || true)
+        DELETIONS=$(echo "$RESULT_JSON" | jq -r '.deletions // empty' 2>/dev/null || true)
+        ISSUE_VAL=$(echo "$RESULT_JSON" | jq -r '.issue // empty' 2>/dev/null || true)
+        if [ -z "$ISSUE_VAL" ]; then ISSUE_VAL="$ISSUE_NUM"; fi
+        case "$STATUS" in
+            success) OUTCOME_NAME=$([ "$TYPE" = "followup" ] && echo "followup_success" || echo "pr_submitted") ;;
+            failure) OUTCOME_NAME=$([ "$TYPE" = "followup" ] && echo "followup_failure" || echo "implementation_failure") ;;
+            already_fixed) OUTCOME_NAME="already_fixed_upstream" ;;
+            abandoned) OUTCOME_NAME="implementation_abandoned" ;;
+            *) OUTCOME_NAME="implementation_result" ;;
+        esac
+        cmd=(bash "$SCRIPT_DIR/record-outcome.sh" "$OUTCOME_NAME" --id "result-${BASENAME}" --repo "$REPO")
+        [ -n "$ISSUE_VAL" ] && cmd+=(--issue "$ISSUE_VAL")
+        [ -n "$PR_NUM" ] && cmd+=(--pr "$PR_NUM")
+        [ -n "$FAILURE_REASON" ] && cmd+=(--failure-category "$FAILURE_REASON")
+        cmd+=(--metadata-json "{\"source\": \"result_file\", \"type\": $(echo "$TYPE" | jq -R .), \"status\": $(echo "$STATUS" | jq -R .), \"files_changed\": ${FILES_CHANGED:-null}, \"additions\": ${ADDITIONS:-null}, \"deletions\": ${DELETIONS:-null}, \"path\": $(echo "$BASENAME" | jq -R .)}")
+        "${cmd[@]}" >/dev/null 2>&1 || true
+    fi
 done
 
 # --- Merge both sources and rebuild ledger ---

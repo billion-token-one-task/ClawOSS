@@ -3,10 +3,12 @@ set -euo pipefail
 
 echo "=== ClawOSS Setup ==="
 
-# Auto-detect paths
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-WORKSPACE_DIR="$PROJECT_DIR/workspace"
+. "$SCRIPT_DIR/lib/path-helpers.sh"
+
+PROJECT_DIR="$(clawoss_resolve_project_dir "$0")"
+WORKSPACE_DIR="$(clawoss_resolve_workspace_dir "$0")"
+CLAWOSS_DEFAULT_MODEL="${CLAWOSS_DEFAULT_MODEL:-minimax/MiniMax-M2.7}"
 
 # Check prerequisites
 echo "Checking prerequisites..."
@@ -26,16 +28,16 @@ else
     exit 1
 fi
 
-# Validate required env vars
-if [ -z "${GITHUB_TOKEN:-}" ]; then
-    echo "Error: GITHUB_TOKEN not set in .env"
+# Validate required auth/env
+if [ -z "${GITHUB_TOKEN:-}" ] && ! gh auth status >/dev/null 2>&1; then
+    echo "Error: set GITHUB_TOKEN in .env or authenticate gh before setup"
     exit 1
 fi
-if [ -z "${KIMI_API_KEY:-}" ]; then
-    echo "Error: KIMI_API_KEY not set in .env (required — OpenRouter is not supported due to content filter)"
+if [ -z "${MINIMAX_API_KEY:-}" ] && [ -z "${KIMI_API_KEY:-}" ]; then
+    echo "Error: set MINIMAX_API_KEY in .env (recommended) or KIMI_API_KEY for fallback mode"
     exit 1
 fi
-echo "[OK] API keys configured"
+echo "[OK] Auth and model API keys configured"
 
 # Configure git identity
 GITHUB_USERNAME="${GITHUB_USERNAME:-BillionClaw}"
@@ -73,6 +75,9 @@ else
     echo "[OK] Workspace linked"
 fi
 
+bash "$SCRIPT_DIR/init-workspace-state.sh" >/dev/null
+echo "[OK] Workspace state initialized"
+
 # Deploy config with path substitution
 echo "Deploying config..."
 sed \
@@ -84,9 +89,14 @@ sed \
 # Inject env vars into deployed config (via env vars, not shell interpolation)
 _CONFIG_PATH="$OPENCLAW_DIR/openclaw.json" \
 _KIMI_KEY="${KIMI_API_KEY:-}" \
+_MINIMAX_KEY="${MINIMAX_API_KEY:-}" \
 _GH_TOKEN="${GITHUB_TOKEN:-}" \
 _DASH_URL="${DASHBOARD_URL:-https://clawoss-dashboard.vercel.app}" \
 _CLAW_KEY="${CLAW_API_KEY:-}" \
+_CLAWOSS_ROOT="${PROJECT_DIR}" \
+_CLAWOSS_MODEL="${CLAWOSS_DEFAULT_MODEL}" \
+_RECORD_DECISIONS="${CLAWOSS_RECORD_DECISIONS:-1}" \
+_RECORD_OUTCOMES="${CLAWOSS_RECORD_OUTCOMES:-1}" \
 python3 -c "
 import json, os
 config_path = os.environ['_CONFIG_PATH']
@@ -94,9 +104,14 @@ with open(config_path) as f: c = json.load(f)
 c.setdefault('env', {})
 env_vars = {
     'KIMI_API_KEY': os.environ.get('_KIMI_KEY', ''),
+    'MINIMAX_API_KEY': os.environ.get('_MINIMAX_KEY', ''),
     'GITHUB_TOKEN': os.environ.get('_GH_TOKEN', ''),
     'DASHBOARD_URL': os.environ.get('_DASH_URL', ''),
     'CLAW_API_KEY': os.environ.get('_CLAW_KEY', ''),
+    'CLAWOSS_ROOT': os.environ.get('_CLAWOSS_ROOT', ''),
+    'CLAWOSS_DEFAULT_MODEL': os.environ.get('_CLAWOSS_MODEL', ''),
+    'CLAWOSS_RECORD_DECISIONS': os.environ.get('_RECORD_DECISIONS', ''),
+    'CLAWOSS_RECORD_OUTCOMES': os.environ.get('_RECORD_OUTCOMES', ''),
 }
 for k, v in env_vars.items():
     if v:
@@ -109,7 +124,7 @@ echo "[OK] Config deployed with env vars"
 # Install PR ledger sync launchd plist
 PLIST_SRC="$PROJECT_DIR/config/com.clawoss.pr-ledger-sync.plist"
 PLIST_DST="$HOME/Library/LaunchAgents/com.clawoss.pr-ledger-sync.plist"
-if [ -f "$PLIST_SRC" ]; then
+if clawoss_is_macos && [ -f "$PLIST_SRC" ]; then
     launchctl unload "$PLIST_DST" 2>/dev/null || true
     sed \
         -e "s|__PROJECT_DIR__|$PROJECT_DIR|g" \
@@ -117,6 +132,8 @@ if [ -f "$PLIST_SRC" ]; then
         "$PLIST_SRC" > "$PLIST_DST"
     launchctl load "$PLIST_DST" 2>/dev/null || true
     echo "[OK] PR ledger sync installed (launchd, 60s interval)"
+elif [ -f "$PLIST_SRC" ]; then
+    echo "[INFO] Skipping PR ledger sync plist install on non-macOS"
 fi
 
 # Install PII sanitizer plugin

@@ -8,6 +8,8 @@ REPO="${1:?Usage: respond-to-review.sh <owner/repo> <pr_number> <action>}"
 PR_NUM="${2:?Usage: respond-to-review.sh <owner/repo> <pr_number> <action>}"
 ACTION="${3:?Usage: respond-to-review.sh <owner/repo> <pr_number> <action>}"
 MESSAGE=""
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+RECORD_OUTCOMES="${CLAWOSS_RECORD_OUTCOMES:-0}"
 
 shift 3
 while [ $# -gt 0 ]; do
@@ -18,8 +20,26 @@ while [ $# -gt 0 ]; do
 done
 
 fail() {
+  if [ "$RECORD_OUTCOMES" = "1" ]; then
+    bash "$SCRIPT_DIR/record-outcome.sh" followup_failure \
+      --id "review-${REPO//\//_}-${PR_NUM}-${ACTION}-failure" \
+      --repo "$REPO" \
+      --pr "$PR_NUM" \
+      --failure-category "tool_error" \
+      --metadata-json "{\"action\": $(echo "$ACTION" | jq -R .), \"reason\": $(echo "$1" | jq -R .)}" >/dev/null 2>&1 || true
+  fi
   python3 -c "import json,sys; print(json.dumps({'success': False, 'action': sys.argv[1], 'reason': sys.argv[2]}))" "$ACTION" "$1" 2>/dev/null || echo '{"success": false, "action": "unknown", "reason": "failed"}'
   exit 1
+}
+
+record_success() {
+  if [ "$RECORD_OUTCOMES" = "1" ]; then
+    bash "$SCRIPT_DIR/record-outcome.sh" followup_action \
+      --id "review-${REPO//\//_}-${PR_NUM}-${ACTION}" \
+      --repo "$REPO" \
+      --pr "$PR_NUM" \
+      --metadata-json "{\"action\": $(echo "$ACTION" | jq -R .)}" >/dev/null 2>&1 || true
+  fi
 }
 
 case "$ACTION" in
@@ -27,7 +47,7 @@ case "$ACTION" in
     # Request merge (comment asking maintainer to merge)
     gh api "repos/${REPO}/issues/${PR_NUM}/comments" \
       -f body="${MESSAGE:-Thank you for the review! This is ready to merge when you get a chance.}" 2>/dev/null
-    [ $? -eq 0 ] && echo '{"success": true, "action": "merge", "method": "comment"}' || fail "Failed to post merge request comment"
+    [ $? -eq 0 ] && { record_success; echo '{"success": true, "action": "merge", "method": "comment"}'; } || fail "Failed to post merge request comment"
     ;;
 
   bump)
@@ -35,35 +55,35 @@ case "$ACTION" in
     DAYS="${MESSAGE:-7}"
     gh api "repos/${REPO}/issues/${PR_NUM}/comments" \
       -f body="Friendly bump -- this PR has been open for a while. Happy to make any changes if needed, or close it if no longer relevant." 2>/dev/null
-    [ $? -eq 0 ] && echo '{"success": true, "action": "bump"}' || fail "Failed to post bump comment"
+    [ $? -eq 0 ] && { record_success; echo '{"success": true, "action": "bump"}'; } || fail "Failed to post bump comment"
     ;;
 
   identity)
     # Respond to "are you a bot?" questions
     gh api "repos/${REPO}/issues/${PR_NUM}/comments" \
       -f body="${MESSAGE:-This is BillionClaw. Happy to discuss the approach or make adjustments to the fix.}" 2>/dev/null
-    [ $? -eq 0 ] && echo '{"success": true, "action": "identity"}' || fail "Failed to post identity response"
+    [ $? -eq 0 ] && { record_success; echo '{"success": true, "action": "identity"}'; } || fail "Failed to post identity response"
     ;;
 
   close-fixed)
     # Close PR because the issue was fixed elsewhere
     gh pr close "$PR_NUM" --repo "$REPO" \
       --comment "${MESSAGE:-Closing — the underlying issue has been resolved in another PR. Thank you for the review time!}" 2>/dev/null
-    [ $? -eq 0 ] && echo '{"success": true, "action": "close-fixed"}' || fail "Failed to close PR"
+    [ $? -eq 0 ] && { record_success; echo '{"success": true, "action": "close-fixed"}'; } || fail "Failed to close PR"
     ;;
 
   close-invalid)
     # Close PR that's no longer valid
     gh pr close "$PR_NUM" --repo "$REPO" \
       --comment "${MESSAGE:-Closing this PR as it is no longer applicable. Thank you for the review time!}" 2>/dev/null
-    [ $? -eq 0 ] && echo '{"success": true, "action": "close-invalid"}' || fail "Failed to close PR"
+    [ $? -eq 0 ] && { record_success; echo '{"success": true, "action": "close-invalid"}'; } || fail "Failed to close PR"
     ;;
 
   thank)
     # Thank reviewer after merge
     gh api "repos/${REPO}/issues/${PR_NUM}/comments" \
       -f body="${MESSAGE:-Thank you for the review and merge! Glad to help.}" 2>/dev/null
-    [ $? -eq 0 ] && echo '{"success": true, "action": "thank"}' || fail "Failed to post thank comment"
+    [ $? -eq 0 ] && { record_success; echo '{"success": true, "action": "thank"}'; } || fail "Failed to post thank comment"
     ;;
 
   comment)
@@ -71,7 +91,7 @@ case "$ACTION" in
     [ -z "$MESSAGE" ] && fail "comment action requires --message"
     gh api "repos/${REPO}/issues/${PR_NUM}/comments" \
       -f body="$MESSAGE" 2>/dev/null
-    [ $? -eq 0 ] && echo '{"success": true, "action": "comment"}' || fail "Failed to post comment"
+    [ $? -eq 0 ] && { record_success; echo '{"success": true, "action": "comment"}'; } || fail "Failed to post comment"
     ;;
 
   *)

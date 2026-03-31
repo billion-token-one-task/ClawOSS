@@ -10,7 +10,10 @@ if [ "${1:-}" = "--help" ]; then
   exit 0
 fi
 
-PROJECT_DIR="${PROJECT_DIR:-/Users/kevinlin/clawOSS}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+. "$SCRIPT_DIR/lib/path-helpers.sh"
+
+PROJECT_DIR="$(clawoss_resolve_project_dir "$0")"
 MEMORY_DIR="$PROJECT_DIR/workspace/memory"
 
 # Wake state (macOS grep doesn't support -P, use sed instead)

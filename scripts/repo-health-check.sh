@@ -9,6 +9,8 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
 if [ $# -lt 1 ]; then
   echo '{"error": "Usage: repo-health-check.sh owner/repo [threshold]"}' >&2
   exit 1
@@ -18,6 +20,7 @@ REPO="$1"
 OWNER="${REPO%%/*}"
 REPO_NAME="${REPO##*/}"
 THRESHOLD="${2:-5}"  # minimum composite score, default 5
+RECORD_DECISIONS="${CLAWOSS_RECORD_DECISIONS:-0}"
 
 # Date calculations (macOS + Linux compatible)
 if date -v-1d +%Y-%m-%d &>/dev/null; then
@@ -56,6 +59,14 @@ fail() {
   "warnings": ${warnings_json}
 }
 ENDJSON
+  if [ "$RECORD_DECISIONS" = "1" ]; then
+    bash "$SCRIPT_DIR/record-decision.sh" repo_health_gate \
+      --repo "$REPO" \
+      --selected false \
+      --score "$score" \
+      --reasoning-summary "$reason" \
+      --metadata-json "{\"failure_category\": $(echo "$category" | jq -R .), \"threshold\": $THRESHOLD}" >/dev/null 2>&1 || true
+  fi
   exit 1
 }
 
@@ -369,6 +380,15 @@ cat <<ENDJSON
   }
 }
 ENDJSON
+
+if [ "$RECORD_DECISIONS" = "1" ]; then
+  bash "$SCRIPT_DIR/record-decision.sh" repo_health_gate \
+    --repo "$REPO" \
+    --selected true \
+    --score "$score" \
+    --reasoning-summary "repo passed health gate" \
+    --metadata-json "{\"threshold\": $THRESHOLD, \"stars\": $STARS, \"review_rate\": $REVIEW_RATE}" >/dev/null 2>&1 || true
+fi
 
 if [ "$PASS" = true ]; then
   exit 0

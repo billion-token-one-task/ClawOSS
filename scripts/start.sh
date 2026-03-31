@@ -4,15 +4,20 @@ set -euo pipefail
 echo "=== Starting ClawOSS ==="
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+. "$SCRIPT_DIR/lib/path-helpers.sh"
+
+PROJECT_DIR="$(clawoss_resolve_project_dir "$0")"
 AGENT_ID="clawoss"
-WORKSPACE_DIR="$PROJECT_DIR/workspace"
+WORKSPACE_DIR="$(clawoss_resolve_workspace_dir "$0")"
+AGENT_MODEL="${CLAWOSS_MODEL:-${CLAWOSS_DEFAULT_MODEL:-minimax/MiniMax-M2.7}}"
 
 # Verify setup
 if [ ! -L "$HOME/.openclaw/workspace" ]; then
     echo "Error: workspace not linked. Run 'npm run setup' first."
     exit 1
 fi
+
+bash "$SCRIPT_DIR/init-workspace-state.sh" >/dev/null
 
 # Register the clawoss agent if it doesn't exist
 if openclaw agents list 2>/dev/null | grep -q "^- $AGENT_ID "; then
@@ -21,7 +26,7 @@ else
     echo "Registering agent '$AGENT_ID'..."
     openclaw agents add "$AGENT_ID" \
         --workspace "$WORKSPACE_DIR" \
-        --model "kimi-coding/k2p5" \
+        --model "$AGENT_MODEL" \
         --non-interactive
     echo "Agent '$AGENT_ID' registered"
 fi
@@ -29,6 +34,10 @@ fi
 # Register cron jobs (skip if already registered to avoid duplicates)
 echo "Registering cron jobs..."
 EXISTING_CRONS=$(openclaw cron list --json 2>/dev/null | jq -r '.jobs[] | select(.agentId == "'"$AGENT_ID"'") | .name' 2>/dev/null || true)
+CRON_JOB_COUNT=$(jq 'length' "$PROJECT_DIR/config/cron-jobs.json" 2>/dev/null || echo 0)
+if [ "${CRON_JOB_COUNT:-0}" -eq 0 ]; then
+    echo "  No cron jobs configured (heartbeat-only mode)"
+fi
 while IFS= read -r job; do
     name=$(echo "$job" | jq -r '.id')
     schedule=$(echo "$job" | jq -r '.schedule.expr')

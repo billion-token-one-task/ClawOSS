@@ -1,0 +1,49 @@
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    environment:
+      PORT: 3000
+      CLAW_API_KEY: ${CLAW_API_KEY:-dev-secret}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      TURSO_DATABASE_URL: file:/data/clawoss.db
+      CLAWOSS_WORKSPACE_DIR: /workspace
+    ports:
+      - "3000:3000"
+    volumes:
+      - clawoss_db:/data
+      - ./workspace:/workspace
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/worker.Dockerfile
+    environment:
+      API_BASE_URL: http://api:3000
+      CLAW_API_KEY: ${CLAW_API_KEY:-dev-secret}
+      WORKSPACE_DIR: /workspace
+      POLL_INTERVAL_MS: 10000
+    depends_on:
+      - api
+    volumes:
+      - ./workspace:/workspace
+
+  reflection:
+    build:
+      context: .
+      dockerfile: docker/reflection.Dockerfile
+    environment:
+      API_BASE_URL: http://api:3000
+      CLAW_API_KEY: ${CLAW_API_KEY:-dev-secret}
+      WORKSPACE_DIR: /workspace
+      POLL_INTERVAL_MS: 30000
+    depends_on:
+      - api
+    volumes:
+      - ./workspace:/workspace
+
+volumes:
+  clawoss_db:

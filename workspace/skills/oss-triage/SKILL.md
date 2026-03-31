@@ -39,7 +39,7 @@ Read `memory/trust-repos.md` Deprioritized section. If the repo appears there AN
 ### 0c. Repo Health Gate (MANDATORY — check BEFORE spending triage tokens)
 **We only contribute to repos that will actually review and merge our work.**
 
-Run `/Users/kevinlin/clawOSS/scripts/repo-health-check.sh {owner}/{repo}` or quick-check via `gh api`
+Run `$CLAWOSS_ROOT/scripts/repo-health-check.sh {owner}/{repo}` or quick-check via `gh api`
 (use cached results from `memory/repos/` if available and < 24 hours old):
 
 ```bash
@@ -59,7 +59,7 @@ gh pr list --repo {owner}/{repo} --state all --json comments,reviews --limit 20
 gh pr list --repo {owner}/{repo} --state open --json number --jq 'length'
 ```
 
-**HARD SKIP if `/Users/kevinlin/clawOSS/scripts/repo-health-check.sh` exits 1.** The script checks (with tiered thresholds for large repos):
+**HARD SKIP if `$CLAWOSS_ROOT/scripts/repo-health-check.sh` exits 1.** The script checks (with tiered thresholds for large repos):
 - Stars < 200
 - No commits in last 2 weeks
 - 0 merged PRs in last 30 days
@@ -113,6 +113,15 @@ fi
 ```
 
 If linked PRs, assignees, closed state, or recent fixes found, SKIP with reason `superseded`, `assigned`, or `already_fixed_upstream`. Mark in pr-ledger.md so we don't re-check.
+Also record the guardrail rejection:
+```bash
+bash "$CLAWOSS_ROOT/scripts/record-decision.sh" issue_guardrail \
+  --repo {owner}/{repo} \
+  --issue {number} \
+  --selected false \
+  --reasoning-summary "triage rejected issue during pre-checks" \
+  --metadata-json '{"source":"oss-triage"}'
+```
 
 ## Step 1: Contribution Type Assessment
 
@@ -256,6 +265,17 @@ Bug fixes: use the complexity assessment from Step 3 (Simple=<30, Medium=30-100,
 Issues with P(merge) >= 60 get priority spawning (pass to HEARTBEAT as `priority: high`).
 
 Include P(merge) in the output alongside the quality score.
+
+When an issue passes triage and is added to the queue, record the choice:
+```bash
+bash "$CLAWOSS_ROOT/scripts/record-decision.sh" triage_accept \
+  --repo {owner}/{repo} \
+  --issue {number} \
+  --selected true \
+  --score {quality_score} \
+  --expected-merge-prob {p_merge_decimal} \
+  --reasoning-summary "issue passed merge-optimized triage"
+```
 
 ## Decision
 - **Attempt**: Score >= 5 AND P(merge) >= 30, in healthy repo (merge time < 14d, review rate > 50%), created recently (< 2 weeks), clear scope, can be fully resolved

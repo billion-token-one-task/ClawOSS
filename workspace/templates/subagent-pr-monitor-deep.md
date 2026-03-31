@@ -14,7 +14,7 @@ runTimeoutSeconds: 0
 
 ## CRITICAL: Script Path
 ```bash
-SCRIPTS=/Users/kevinlin/clawOSS/scripts
+SCRIPTS=$CLAWOSS_ROOT/scripts
 ```
 
 ## Web Search
@@ -41,7 +41,7 @@ WHILE context < 70%:
 ### Step 2: Deep Comment Fetch (for each active PR)
 
 ```bash
-SCRIPTS=/Users/kevinlin/clawOSS/scripts
+SCRIPTS=$CLAWOSS_ROOT/scripts
 
 # Top-level PR comments
 gh api repos/{owner}/{repo}/issues/{pr}/comments --jq '.[] | {id, user: .user.login, body: .body[:500], created_at: .created_at}' 2>/dev/null

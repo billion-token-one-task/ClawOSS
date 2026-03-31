@@ -14,7 +14,7 @@ attachments: [repo-conventions.md, issue-details.md]
 ## CRITICAL: Workspace Rules
 **EVERY bash block MUST start with:**
 ```bash
-SCRIPTS=/Users/kevinlin/clawOSS/scripts
+SCRIPTS=$CLAWOSS_ROOT/scripts
 ```
 **ALL work MUST happen in `/tmp/clawoss-{issue}-{timestamp}/`.** NEVER clone repos to `/tmp/{repo-name}/` or any other location. NEVER run `npm install`, `pip install`, `cargo build`, or any dependency installation OUTSIDE your `/tmp/clawoss-*` workspace. This is NON-NEGOTIABLE — a cleanup daemon deletes stale dirs, and anything outside `/tmp/clawoss-*` wastes disk and escapes cleanup.
 
@@ -88,7 +88,7 @@ Read the attached repo-conventions.md and issue-details.md.
 
 1. SETUP WORKSPACE — run quick checks, then clone:
    ```bash
-   SCRIPTS=/Users/kevinlin/clawOSS/scripts
+   SCRIPTS=$CLAWOSS_ROOT/scripts
 
    # Quick checks (use gh directly — no scripts needed for basic gates)
    # Is issue still open?

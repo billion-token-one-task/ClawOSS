@@ -18,7 +18,7 @@ attachments: [followup-{repo}-{pr}.md]
 ## CRITICAL: Workspace Rules
 **EVERY bash block MUST start with:**
 ```bash
-SCRIPTS=/Users/kevinlin/clawOSS/scripts
+SCRIPTS=$CLAWOSS_ROOT/scripts
 ```
 **ALL work MUST happen in `/tmp/clawoss-followup-{pr}-{timestamp}/`.** NEVER clone to `/tmp/{repo-name}/` or any other location outside the `clawoss-` prefix. Cleanup daemon deletes stale dirs — anything outside `/tmp/clawoss-*` escapes cleanup and wastes disk.
 
@@ -80,7 +80,7 @@ This is MUCH better than a generic top-level "addressed feedback" comment. Maint
 
 1b. HEALTH GATE (defense-in-depth — skip follow-up if repo now fails health):
    ```bash
-   bash /Users/kevinlin/clawOSS/scripts/repo-health-check.sh {owner}/{repo}
+   bash "$CLAWOSS_ROOT/scripts/repo-health-check.sh" {owner}/{repo}
    if [ $? -ne 0 ]; then
      echo "SKIP: repo {owner}/{repo} now fails health check — not worth following up"
      rm -rf $WORKDIR
@@ -105,44 +105,56 @@ This is MUCH better than a generic top-level "addressed feedback" comment. Maint
 
 6. Run tests to verify no regressions
 
-7. Commit and push to the SAME branch (updates the PR automatically)
+7. Alpha human gate before push:
+   ```bash
+   DIFF_LINES=$(git diff --shortstat 2>/dev/null | awk '{add+=$4; del+=$6} END {print add+del+0}')
+   bash "$CLAWOSS_ROOT/scripts/evaluate-alpha-gate.sh" followup_push \
+     --repo {owner}/{repo} \
+     --followup-round {round} \
+     --diff-lines "${DIFF_LINES:-0}" \
+     --reasoning-summary "review feedback addressed locally" \
+     --record
+   ```
+   If decision is `review`, stop and write a result indicating `pending_human_review`.
 
-8. Respond to reviewers:
+8. Commit and push to the SAME branch (updates the PR automatically)
+
+9. Respond to reviewers:
    - General comments: gh pr comment {number} --repo {owner}/{repo} --body '...'
    - Inline replies: gh api repos/{owner}/{repo}/pulls/{number}/comments -X POST -f body='...' -F in_reply_to={comment_id}
 
-9. Stay within the original contribution scope — do NOT expand to features even if reviewer suggests
+10. Stay within the original contribution scope — do NOT expand to features even if reviewer suggests
 
-10. If reviewer says the contribution is out of scope: adjust scope to match feedback, or leave PR open
+11. If reviewer says the contribution is out of scope: adjust scope to match feedback, or leave PR open
     for maintainer to close. Comment: "Thanks for the feedback — happy to adjust the scope." Mark as scope_adjusted.
 
-10b. If issue reporter or reviewer says "fix doesn't work" / "doesn't resolve the issue" / "wrong approach":
+11b. If issue reporter or reviewer says "fix doesn't work" / "doesn't resolve the issue" / "wrong approach":
     **REWORK** — read ALL review comments, understand the feedback, implement a different approach.
     Force-push to the same branch. Comment on PR: "Thanks for the feedback — reworked with a different approach."
     Mark as rework_in_progress. Only mark fix_rejected_terminal if 2+ rework attempts also fail.
 
-10c. If maintainer says "already fixed" / "fixed in latest release" / "resolved upstream":
+11c. If maintainer says "already fixed" / "fixed in latest release" / "resolved upstream":
     ```bash
-    bash /Users/kevinlin/clawOSS/scripts/respond-to-review.sh {owner}/{repo} {pr} close-fixed
+    bash "$CLAWOSS_ROOT/scripts/respond-to-review.sh" {owner}/{repo} {pr} close-fixed
     ```
     Mark as already_fixed_upstream. Do NOT argue or ask for merge anyway.
 
-10d. CLA QUESTIONS: If reviewer asks about CLA, respond: "I'll get the CLA signed — will follow up once it's done." Do NOT attempt to sign CLAs yourself.
+11d. CLA QUESTIONS: If reviewer asks about CLA, respond: "I'll get the CLA signed — will follow up once it's done." Do NOT attempt to sign CLAs yourself.
 
-10e. IDENTITY QUESTIONS ("are you an AI?", "are you a bot?", "is this AI-generated?"):
+11e. IDENTITY QUESTIONS ("are you an AI?", "are you a bot?", "is this AI-generated?"):
     Reply: "I'm BillionClaw." Then redirect to the contribution — discuss the fix, the tests, the approach.
     No further explanation needed. Do not reference any project, tools, or methodology.
 
-11. If round 3: post polite disengagement message, do NOT close PR yourself — leave for maintainer
+12. If round 3: post polite disengagement message, do NOT close PR yourself — leave for maintainer
 
-12. Write results to memory/subagent-result-followup-{repo}-{pr}.md
+13. Write results to memory/subagent-result-followup-{repo}-{pr}.md
     using the format defined in templates/subagent-result-schema.md
     If reviewer approved or gave positive feedback, update trust:
     ```bash
-    bash /Users/kevinlin/clawOSS/scripts/update-trust-repos.sh {owner}/{repo} promote
+    bash "$CLAWOSS_ROOT/scripts/update-trust-repos.sh" {owner}/{repo} promote
     ```
 
-13. CLEANUP: rm -rf $WORKDIR
+14. CLEANUP: rm -rf $WORKDIR
 
 Then reply: ANNOUNCE_SKIP
 

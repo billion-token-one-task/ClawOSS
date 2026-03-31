@@ -6,7 +6,10 @@
 REPO="${1:?Usage: lock-repo.sh <owner/repo> <issue_number> [reason]}"
 ISSUE="${2:?Usage: lock-repo.sh <owner/repo> <issue_number>}"
 REASON="${3:-workspace-setup}"
-PROJECT_DIR="${PROJECT_DIR:-/Users/kevinlin/clawOSS}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+. "$SCRIPT_DIR/lib/path-helpers.sh"
+
+PROJECT_DIR="$(clawoss_resolve_project_dir "$0")"
 OWNER="${REPO%%/*}"
 REPO_NAME="${REPO##*/}"
 

@@ -1,0 +1,16 @@
+{
+  "submit": {
+    "auto_pr_types": ["docs", "typo", "test"],
+    "max_diff_lines_auto": 80,
+    "max_diff_lines_bugfix_auto": 40,
+    "min_trust_score_auto": 7,
+    "require_trusted_repo_for_bugfix": true
+  },
+  "followup": {
+    "max_round_auto": 2,
+    "max_diff_lines_auto": 120
+  },
+  "strategy": {
+    "promotion_requires_human": true
+  }
+}

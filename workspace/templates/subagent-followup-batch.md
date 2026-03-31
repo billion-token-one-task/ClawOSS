@@ -14,7 +14,7 @@ attachments: [batch-context.json]
 
 ## CRITICAL: Script Path
 ```bash
-SCRIPTS=/Users/kevinlin/clawOSS/scripts
+SCRIPTS=$CLAWOSS_ROOT/scripts
 ```
 **ALL work MUST happen in `/tmp/clawoss-batch-{timestamp}/`.** NEVER clone to `/tmp/{repo-name}/` or any location outside the `clawoss-` prefix.
 
@@ -36,7 +36,7 @@ Read the attached `batch-context.json` for the list of PRs to process.
 
 ### Setup
 ```bash
-SCRIPTS=/Users/kevinlin/clawOSS/scripts
+SCRIPTS=$CLAWOSS_ROOT/scripts
 BATCH_WORKDIR=/tmp/clawoss-batch-$(date +%s)
 mkdir -p $BATCH_WORKDIR
 ```

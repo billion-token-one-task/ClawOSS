@@ -11,10 +11,25 @@ echo "=== ClawOSS V10 Full Restart ==="
 echo ""
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-WORKSPACE_DIR="$PROJECT_DIR/workspace"
+. "$SCRIPT_DIR/lib/path-helpers.sh"
+
+PROJECT_DIR="$(clawoss_resolve_project_dir "$0")"
+WORKSPACE_DIR="$(clawoss_resolve_workspace_dir "$0")"
+CLAWOSS_DEFAULT_MODEL="${CLAWOSS_DEFAULT_MODEL:-minimax/MiniMax-M2.7}"
 DEPLOYED_CONFIG="$HOME/.openclaw/openclaw.json"
 GATEWAY_PLIST="$HOME/Library/LaunchAgents/ai.openclaw.gateway.plist"
+SMOKE_MODE=0
+
+case "${CLAWOSS_SMOKE_MODE:-0}" in
+    1|true|TRUE|yes|YES) SMOKE_MODE=1 ;;
+esac
+
+smoke_sleep() {
+    if [ "$SMOKE_MODE" -eq 1 ]; then
+        return 0
+    fi
+    sleep "$1"
+}
 
 # ── 0. Preflight checks ──────────────────────────────────────────────
 MISSING=()
@@ -30,6 +45,9 @@ if [ ${#MISSING[@]} -gt 0 ]; then
     exit 1
 fi
 echo "[OK] All required tools found (python3, gh, jq, openclaw, node)"
+if [ "$SMOKE_MODE" -eq 1 ]; then
+    echo "[INFO] Restart smoke mode enabled — skipping global cleanup and external side effects where possible"
+fi
 
 # 0b. Ensure `python` resolves to `python3` (macOS has no `python` binary)
 # Subagents run target repo test suites that call `python` — this prevents failures.
@@ -105,6 +123,10 @@ _GH_TOKEN="${GITHUB_TOKEN:-}" \
 _DASH_URL="${DASHBOARD_URL:-https://clawoss-dashboard.vercel.app}" \
 _CLAW_KEY="${CLAW_API_KEY:-}" \
 _OPENROUTER_KEY="${OPENROUTER_API_KEY:-}" \
+_CLAWOSS_ROOT="${PROJECT_DIR}" \
+_CLAWOSS_MODEL="${CLAWOSS_DEFAULT_MODEL}" \
+_RECORD_DECISIONS="${CLAWOSS_RECORD_DECISIONS:-1}" \
+_RECORD_OUTCOMES="${CLAWOSS_RECORD_OUTCOMES:-1}" \
 python3 -c "
 import json, os
 
@@ -137,6 +159,10 @@ env_map = {
     'DASHBOARD_URL': os.environ.get('_DASH_URL', ''),
     'CLAW_API_KEY': os.environ.get('_CLAW_KEY', ''),
     'OPENROUTER_API_KEY': os.environ.get('_OPENROUTER_KEY', ''),
+    'CLAWOSS_ROOT': os.environ.get('_CLAWOSS_ROOT', ''),
+    'CLAWOSS_DEFAULT_MODEL': os.environ.get('_CLAWOSS_MODEL', ''),
+    'CLAWOSS_RECORD_DECISIONS': os.environ.get('_RECORD_DECISIONS', ''),
+    'CLAWOSS_RECORD_OUTCOMES': os.environ.get('_RECORD_OUTCOMES', ''),
 }
 for k, v in env_map.items():
     if v:
@@ -177,7 +203,7 @@ fi
 # ── 6. Update gateway plist PATH (ensure python3, gh, jq are reachable) ─
 # The gateway spawns subagents that need these tools. launchd has a minimal
 # PATH so we inject the paths we need.
-if [ -f "$GATEWAY_PLIST" ]; then
+if clawoss_is_macos && [ -f "$GATEWAY_PLIST" ]; then
     # Get current PATH from plist
     PLIST_PATH=$(/usr/libexec/PlistBuddy -c "Print :EnvironmentVariables:PATH" "$GATEWAY_PLIST" 2>/dev/null || echo "")
     NEEDS_UPDATE=false
@@ -294,24 +320,32 @@ find "$WORKSPACE_DIR/memory/locks/" -name "*.lock" -delete 2>/dev/null || true
 echo "[OK] All lock files cleaned ($ALL_LOCKS removed)"
 
 # ── 11. Clean ALL /tmp workspaces (restart = full cleanup) ────────────
-ORPHANED=$(find /tmp -maxdepth 1 -name "clawoss-*" -type d 2>/dev/null | wc -l | tr -d ' ')
-find /tmp -maxdepth 1 -name "clawoss-*" -type d -exec rm -rf {} + 2>/dev/null || true
-echo "[OK] All /tmp workspaces cleaned ($ORPHANED removed)"
+if [ "$SMOKE_MODE" -eq 1 ]; then
+    echo "[INFO] Smoke mode: skipping /tmp/clawoss-* cleanup"
+else
+    ORPHANED=$(find /tmp -maxdepth 1 -name "clawoss-*" -type d 2>/dev/null | wc -l | tr -d ' ')
+    find /tmp -maxdepth 1 -name "clawoss-*" -type d -exec rm -rf {} + 2>/dev/null || true
+    echo "[OK] All /tmp workspaces cleaned ($ORPHANED removed)"
+fi
 
 # ── 12. Kill all subagents, then stop gateway ─────────────────────────
 # Kill all running subagents BEFORE stopping the gateway.
 # This prevents orphaned LLM inference runs that consume API tokens.
 # The /subagents kill all command terminates all active subagent runs.
 if openclaw gateway status 2>/dev/null | grep -qi "running\|reachable\|ok"; then
-    echo "[INFO] Killing all active subagents..."
-    openclaw system event --text "/subagents kill all" --mode now 2>/dev/null || true
-    sleep 3  # Give gateway time to process kill commands
-    # Also run sessions cleanup to prune any stale entries
-    openclaw sessions cleanup --agent clawoss 2>/dev/null || true
-    echo "[OK] All subagents killed"
+    if [ "$SMOKE_MODE" -eq 1 ]; then
+        echo "[INFO] Smoke mode: skipping subagent kill event and session cleanup"
+    else
+        echo "[INFO] Killing all active subagents..."
+        openclaw system event --text "/subagents kill all" --mode now 2>/dev/null || true
+        smoke_sleep 3  # Give gateway time to process kill commands
+        # Also run sessions cleanup to prune any stale entries
+        openclaw sessions cleanup --agent clawoss 2>/dev/null || true
+        echo "[OK] All subagents killed"
+    fi
 fi
 openclaw gateway stop 2>/dev/null || true
-sleep 2
+smoke_sleep 2
 echo "[OK] Gateway stopped"
 
 # ── 13. Start gateway (prefer install for launchd, fallback to run) ───
@@ -326,7 +360,7 @@ else
     echo "[OK] Gateway started in background (PID $!)"
 fi
 
-sleep 8  # 8s to allow gateway to fully initialize heartbeat timer + session registry
+smoke_sleep 8  # 8s to allow gateway to fully initialize heartbeat timer + session registry
 
 # Verify gateway is running
 if openclaw gateway status 2>/dev/null | grep -qi "running\|reachable\|ok"; then
@@ -340,11 +374,17 @@ else
 fi
 
 # ── 14. Dashboard sync ───────────────────────────────────────────────
-pkill -f "dashboard-sync" 2>/dev/null || true
-sleep 1
+if [ "$SMOKE_MODE" -eq 1 ]; then
+    echo "[INFO] Smoke mode: skipping dashboard-sync pkill"
+else
+    pkill -f "dashboard-sync" 2>/dev/null || true
+fi
+smoke_sleep 1
 
 if [ -f "$PROJECT_DIR/scripts/dashboard-sync.sh" ]; then
-    if [ -z "${CLAW_API_KEY:-}" ]; then
+    if [ "$SMOKE_MODE" -eq 1 ]; then
+        echo "[INFO] Smoke mode: skipping dashboard-sync startup"
+    elif [ -z "${CLAW_API_KEY:-}" ]; then
         echo "[WARN] CLAW_API_KEY not set — dashboard-sync will not start"
     else
         nohup bash "$PROJECT_DIR/scripts/dashboard-sync.sh" > /tmp/dashboard-sync.log 2>&1 &
@@ -356,27 +396,33 @@ fi
 
 # ── 15. PR ledger sync (launchd, runs every 60s) ─────────────────────
 LEDGER_PLIST="$HOME/Library/LaunchAgents/com.clawoss.pr-ledger-sync.plist"
-launchctl unload "$LEDGER_PLIST" 2>/dev/null || true
+if clawoss_is_macos; then
+    launchctl unload "$LEDGER_PLIST" 2>/dev/null || true
 
-if [ -f "$PROJECT_DIR/config/com.clawoss.pr-ledger-sync.plist" ]; then
-    sed \
-        -e "s|__PROJECT_DIR__|$PROJECT_DIR|g" \
-        -e "s|__HOME_DIR__|$HOME|g" \
-        "$PROJECT_DIR/config/com.clawoss.pr-ledger-sync.plist" > "$LEDGER_PLIST"
-    launchctl load "$LEDGER_PLIST" 2>/dev/null || true
-    echo "[OK] PR ledger sync installed (launchd, 60s interval)"
-elif [ -f "$LEDGER_PLIST" ]; then
-    launchctl load "$LEDGER_PLIST" 2>/dev/null || true
-    echo "[OK] PR ledger sync loaded (existing plist)"
+    if [ -f "$PROJECT_DIR/config/com.clawoss.pr-ledger-sync.plist" ]; then
+        sed \
+            -e "s|__PROJECT_DIR__|$PROJECT_DIR|g" \
+            -e "s|__HOME_DIR__|$HOME|g" \
+            "$PROJECT_DIR/config/com.clawoss.pr-ledger-sync.plist" > "$LEDGER_PLIST"
+        launchctl load "$LEDGER_PLIST" 2>/dev/null || true
+        echo "[OK] PR ledger sync installed (launchd, 60s interval)"
+    elif [ -f "$LEDGER_PLIST" ]; then
+        launchctl load "$LEDGER_PLIST" 2>/dev/null || true
+        echo "[OK] PR ledger sync loaded (existing plist)"
+    else
+        echo "[INFO] No pr-ledger-sync plist found — skipping"
+    fi
 else
-    echo "[INFO] No pr-ledger-sync plist found — skipping"
+    echo "[INFO] PR ledger sync launchd integration is skipped on non-macOS"
 fi
 
 # ── 15b. Ensure dual push remotes (CMLKevin + billion-token-one-task) ──
 cd "$PROJECT_DIR"
 # Add billionclaw as second push URL so `git push origin` goes to both repos
 PUSH_URLS=$(git remote get-url --push --all origin 2>/dev/null || echo "")
-if ! echo "$PUSH_URLS" | grep -q "billion-token-one-task"; then
+if [ "$SMOKE_MODE" -eq 1 ]; then
+    echo "[INFO] Smoke mode: skipping dual push remote mutation"
+elif ! echo "$PUSH_URLS" | grep -q "billion-token-one-task"; then
     git remote set-url --add --push origin https://github.com/billion-token-one-task/ClawOSS.git 2>/dev/null || true
     echo "[OK] Added billion-token-one-task as second push target"
 else
@@ -384,8 +430,10 @@ else
 fi
 
 # ── 16. Kick the agent ───────────────────────────────────────────────
-sleep 3
-if openclaw system event \
+smoke_sleep 3
+if [ "$SMOKE_MODE" -eq 1 ]; then
+    echo "[INFO] Smoke mode: skipping agent wake event"
+elif openclaw system event \
     --text "ClawOSS V10.1 restart. Execute HEARTBEAT.md steps 0-7. Always-on agents use runTimeoutSeconds:0 (no timeout). Discover across ALL niches. Fill all 10 impl slots. NEVER idle — always work on something." \
     --mode now 2>&1; then
     echo "[OK] Agent kicked (V10)"
@@ -394,16 +442,22 @@ else
 fi
 
 # ── 17. Start tmp-cleaner daemon ───────────────────────────────────────
-pkill -f "tmp-cleaner.sh" 2>/dev/null || true
-nohup bash "$PROJECT_DIR/scripts/tmp-cleaner.sh" > /dev/null 2>&1 &
-echo "[OK] tmp-cleaner daemon started (PID $!, cleans /tmp/clawoss-* every 5m)"
+if [ "$SMOKE_MODE" -eq 1 ]; then
+    echo "[INFO] Smoke mode: skipping tmp-cleaner daemon"
+else
+    pkill -f "tmp-cleaner.sh" 2>/dev/null || true
+    nohup bash "$PROJECT_DIR/scripts/tmp-cleaner.sh" > /dev/null 2>&1 &
+    echo "[OK] tmp-cleaner daemon started (PID $!, cleans /tmp/clawoss-* every 5m)"
+fi
 
 # ── 18. Trigger dashboard PR sync ──────────────────────────────────────
 # Sync GitHub PR data to dashboard so it shows current stats immediately
-sleep 5  # Wait for gateway to be fully ready
+smoke_sleep 5  # Wait for gateway to be fully ready
 DASH_URL="${DASHBOARD_URL:-https://clawoss-dashboard.vercel.app}"
 DASH_KEY="${CLAW_API_KEY:-}"
-if [ -n "$DASH_KEY" ]; then
+if [ "$SMOKE_MODE" -eq 1 ]; then
+    echo "[INFO] Smoke mode: skipping dashboard PR sync"
+elif [ -n "$DASH_KEY" ]; then
     SYNC_RESULT=$(curl -s --max-time 30 "${DASH_URL}/api/github/sync" 2>/dev/null)
     SYNCED=$(echo "$SYNC_RESULT" | python3 -c "import json,sys; print(json.load(sys.stdin).get('synced',0))" 2>/dev/null || echo "0")
     echo "[OK] Dashboard PR sync: $SYNCED PRs synced"

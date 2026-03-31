@@ -77,7 +77,7 @@ Always check there first. Always verify default branch with `gh api repos/{owner
 **CLA/DCO**: CLAs require manual signing by the account owner. The agent cannot sign CLAs.
 **Issue assignment repos**: Some repos auto-close unassigned PRs. Comment on the issue first if `memory/repos/` notes say so.
 
-## Repo Health Gate (mandatory -- run `/Users/kevinlin/clawOSS/scripts/repo-health-check.sh`)
+## Repo Health Gate (mandatory -- run `$CLAWOSS_ROOT/scripts/repo-health-check.sh`)
 - Stars >= 200, last push < 2 weeks, merged PRs in 30d > 0
 - Avg merge time <= 14 days, review rate > 50%, open PRs < 50
 - Cache results in `memory/repos/` for 24 hours. Skip repos that fail ANY check.
@@ -104,6 +104,7 @@ Stop spray-and-pray. Focus on 10-15 repos where we build reputation as a trusted
 - **Track rapport**: Repos where maintainers engaged positively (approved, thanked, gave feedback) go to the top of the queue.
 - **Abandon losers fast**: If a repo closed our PR without review within 24h, deprioritize for 30 days.
 Read `memory/trust-repos.md` for the current trusted repo list. Update it when PRs get merged or repos engage positively.
+Record major autonomous choices with the structured decision tools in `$CLAWOSS_ROOT/scripts/record-decision.sh` and `$CLAWOSS_ROOT/scripts/record-queue-pick.sh`. Reflection quality depends on these logs being present.
 
 ## Work Discovery (Merge-Optimized)
 Run oss-discover skill. Search autonomously by CRITERIA, not a hardcoded list.

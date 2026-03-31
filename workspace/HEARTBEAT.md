@@ -34,7 +34,7 @@ You have skills loaded. **Read the SKILL.md file** (use the `read` tool) before 
 Skills: `~/clawOSS/workspace/skills/{name}/SKILL.md`. Load with `read`.
 
 ## 0. Health Checks
-**0a. Quick status snapshot**: `bash /Users/kevinlin/clawOSS/scripts/heartbeat-status.sh` — shows queue depth, open PRs, locks, always-on status, wake state in one JSON call.
+**0a. Quick status snapshot**: `bash "$CLAWOSS_ROOT/scripts/heartbeat-status.sh"` — shows queue depth, open PRs, locks, always-on status, wake state in one JSON call.
 **0a2. Context**: Use the `session_status` tool (NOT a bash command — it's an OpenClaw built-in tool). **>35%: COMPACT IMMEDIATELY** — flush state to memory files, then `/compact`. Do NOT proceed to any other step until context is under 35%. This is the #1 cause of gateway timeouts and stalled cycles.
 **0b. Circuit breakers**: Read wake-state.md (or use heartbeat-status.sh output). If errors_this_hour >= 5, pause 2 minutes then continue (never fully stop). consecutive_wakes is informational only — never use it to skip work.
 **0b2. Cycle guardrails** (prevent runaway cycles and quota burn):
@@ -79,13 +79,15 @@ Always-on subagents use 4 slots. Remaining 10 for impl/followup. Total maxConcur
 
 ## 1. Stall Recovery
 Check for stalled sub-agents (no messages >5 min). Kill, re-queue at TOP of work-queue.md, increment errors_this_hour. Mark stalled task as `failed` in `memory/impl-spawn-state.md`. 2 consecutive stalls on same task = SKIP it.
-**Clean stale locks + orphaned state**: `bash /Users/kevinlin/clawOSS/scripts/cleanup-stale-sessions.sh` (removes locks >30min, resets orphaned spawned_pending entries)
+**Clean stale locks + orphaned state**: `bash "$CLAWOSS_ROOT/scripts/cleanup-stale-sessions.sh"` (removes locks >30min, resets orphaned spawned_pending entries)
 
 ## 2. Pick New Work (PRIORITY — new PRs before follow-ups)
 
 ### 3a. Merge Staging + Trust Priority
 Merge work-queue-staging.md and followup-staging.md into work-queue.md. Clear staging. DEDUP by issue URL.
 **P(merge) SORT**: Sort queue by P(merge) descending. Issues with `priority: high` (P(merge) >= 60) go to TOP. Within same priority, trusted repos (memory/trust-repos.md) go first. Skip any candidate with P(merge) < 30.
+**Decision log**: After choosing the next issue from `memory/work-queue.md` or `memory/work-queue-staging.md`, record the selection:
+`bash "$CLAWOSS_ROOT/scripts/record-queue-pick.sh" "$CLAWOSS_ROOT/workspace/memory/work-queue.md" {owner}/{repo} {issue} --reasoning-summary "selected next autonomous work item"`
 
 ### 3b. Count and Pick
 Count active impl/followup sub-agents (sessions_list, exclude main + always-on scouts/monitors + stale >30min).
@@ -126,6 +128,8 @@ Count active impl/followup sub-agents (sessions_list, exclude main + always-on s
 **4-ZERO.** Quick health check: `gh api repos/{owner}/{repo} --jq '{stars: .stargazers_count, pushed: .pushed_at, archived: .archived}'`. Skip if archived, stars < 100, no push in 30 days. No script needed — use judgment.
 **4a.** Type: bug/docs/typo/test. Title keyword reject (same as 3f). Label reject: `enhancement`, `feature`, `feature-request`, `improvement`, `refactor`, `discussion`, `question`, `proposal`, `rfc`, `design`, `meta`, `chore`, `performance`, `optimization`. Invalid = remove.
 **4b.** Run oss-triage. Skip if: not actionable, vague, wontfix/duplicate/invalid, >30 days old. CLA repos: skip — CLAs require manual signing by the account owner.
+When triage accepts an issue, record the decision with candidate context:
+`bash "$CLAWOSS_ROOT/scripts/record-queue-pick.sh" "$CLAWOSS_ROOT/workspace/memory/work-queue-staging.md" {owner}/{repo} {issue} --stage triage_accept --reasoning-summary "triage accepted issue for queueing"`
 **4b-SUPERSESSION.** Assigned? Linked PRs? "I'll take this" comment? Issue closed? Merged PR refs? If yes, remove and mark in pr-ledger.md.
 **4c.** Score: +5 docs/typo, +3 tests, +5 merge <3d, +3 review >80%, +2 gfi/help-wanted. -5 merge >14d, -10 if 100% closure rate. Skip: 0 merges/30d.
 **4d.** Quick research via web_search.

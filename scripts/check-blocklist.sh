@@ -4,7 +4,10 @@
 # Exit 0 = clear, Exit 1 = blocklisted (reason in JSON output)
 
 REPO="${1:?Usage: check-blocklist.sh <owner/repo>}"
-PROJECT_DIR="${PROJECT_DIR:-/Users/kevinlin/clawOSS}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+. "$SCRIPT_DIR/lib/path-helpers.sh"
+
+PROJECT_DIR="$(clawoss_resolve_project_dir "$0")"
 TRUST_FILE="$PROJECT_DIR/workspace/memory/trust-repos.md"
 
 if [ ! -f "$TRUST_FILE" ]; then
@@ -12,9 +15,20 @@ if [ ! -f "$TRUST_FILE" ]; then
   exit 0
 fi
 
+extract_section() {
+  local heading="$1"
+  local file="$2"
+
+  awk -v heading="$heading" '
+    $0 == heading { in_section=1; next }
+    /^## / && in_section { exit }
+    in_section { print }
+  ' "$file"
+}
+
 # Extract the deprioritized section and check for this repo
-DEPRIORITIZED=$(awk '/^## Deprioritized/,/^$/' "$TRUST_FILE")
-MATCH=$(echo "$DEPRIORITIZED" | grep -i "${REPO}" || true)
+DEPRIORITIZED=$(extract_section "## Deprioritized" "$TRUST_FILE")
+MATCH=$(echo "$DEPRIORITIZED" | grep -iF "${REPO}" || true)
 
 if [ -n "$MATCH" ]; then
   # Extract reason and skip date
