@@ -27,6 +27,22 @@ npm run alpha:deploy
 npm run alpha:upgrade
 ```
 
+## 前置依赖
+
+宿主机需要具备：
+
+- `node` 和 `npm`
+- `openclaw`
+- `gh`
+- `git`
+- 如果要启用 dashboard/API sidecar，还需要 `docker` 和 `docker compose`
+
+最少需要配置的环境变量：
+
+- `GITHUB_TOKEN`
+- `MINIMAX_API_KEY`
+- `CLAW_API_KEY`
+
 ## 相对上一版的变化
 
 上一版证明了多 Agent 架构可以高密度地产出 OSS PR。这一版 alpha 的重点则是把系统变成可运维、可解释、可维护的内部版本。
@@ -61,19 +77,33 @@ npm run alpha:upgrade
 高风险门控配置见 [config/alpha-gates.json](./config/alpha-gates.json)。  
 待人工处理的队列写入 [workspace/memory/human-review-queue.md](./workspace/memory/human-review-queue.md)。
 
-## 部署形态
+## 推荐部署方式
 
-推荐部署形态：
+默认推荐：
 
 - 主机负责运行 `openclaw`、`gh` 和主 ClawOSS agent
 - `docker compose` 负责运行 dashboard/API 以及 `worker`、`reflection` sidecar
 - `.env` 与 [workspace/strategy/current.json](./workspace/strategy/current.json) 是主要可编辑配置面
+
+也支持最小主机模式：
+
+- 执行 `npm run alpha:deploy -- --no-backend`
+- 等主机运行稳定后，再补上 docker sidecar
 
 相关文档：
 
 - [Alpha Deployment](./docs/alpha-deployment.md)
 - [Reproducibility](./docs/reproducibility.md)
 - [Autonomous Backend v1](./docs/autonomous-backend-v1.md)
+
+## Vercel 限制
+
+Vercel 可以承载 `dashboard` 和 API 层，但不能运行完整的自治 agent。
+
+- 适合放到 Vercel：Next.js dashboard、API 路由、GitHub sync cron
+- 不适合放到 Vercel：`openclaw`、主循环常驻 agent、本地 workspace 状态、shell 驱动自动化
+
+如果把 dashboard 部署到 Vercel，数据库应使用 Turso 之类的外部存储，不要依赖 `/tmp` 的临时文件。
 
 ## 验证
 

@@ -27,6 +27,22 @@ Upgrade an existing alpha host with:
 npm run alpha:upgrade
 ```
 
+## Prerequisites
+
+Host requirements:
+
+- `node` and `npm`
+- `openclaw`
+- `gh`
+- `git`
+- `docker` and `docker compose` for the dashboard/API sidecars
+
+Minimum env values:
+
+- `GITHUB_TOKEN`
+- `MINIMAX_API_KEY`
+- `CLAW_API_KEY`
+
 ## What Changed vs. the Previous Version
 
 The previous version proved that a multi-agent stack could generate a large number of OSS pull requests. This alpha focuses on making that system operable, explainable, and maintainable.
@@ -61,19 +77,33 @@ The intended alpha operating mode is:
 High-risk gates are defined in [config/alpha-gates.json](./config/alpha-gates.json).  
 Queued manual checks are written to [workspace/memory/human-review-queue.md](./workspace/memory/human-review-queue.md).
 
-## Deployment Shape
+## Recommended Deployment
 
-Recommended shape:
+Default recommendation:
 
 - host machine runs `openclaw`, `gh`, and the main ClawOSS agent
 - `docker compose` runs the dashboard/API plus `worker` and `reflection` sidecars
 - `.env` and [workspace/strategy/current.json](./workspace/strategy/current.json) remain the main editable config surfaces
+
+Minimal host-only mode is also possible:
+
+- run `npm run alpha:deploy -- --no-backend`
+- add the dockerized sidecars later if the host runtime is stable
 
 This is documented in:
 
 - [Alpha Deployment](./docs/alpha-deployment.md)
 - [Reproducibility](./docs/reproducibility.md)
 - [Autonomous Backend v1](./docs/autonomous-backend-v1.md)
+
+## Vercel Limitation
+
+Vercel can host the `dashboard` and API layer, but it cannot run the full autonomous agent.
+
+- suitable for Vercel: Next.js dashboard, API routes, GitHub sync cron
+- not suitable for Vercel: `openclaw`, the main long-running agent loop, local workspace state, shell-driven automation
+
+If you deploy the dashboard on Vercel, use an external database such as Turso. Falling back to `/tmp` storage is ephemeral.
 
 ## Validation
 
