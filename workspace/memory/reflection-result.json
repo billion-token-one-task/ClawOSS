@@ -1,93 +1,122 @@
 {
-  "insights": [
+  "pattern_identified": [
     {
-      "finding": "Recent failures were mostly process failures, not code-quality failures.",
+      "pattern": "最高成功率来自少量已建立信任的仓库，而不是广撒网式探索",
       "evidence": [
-        "DioCrafts/OxiCloud#252 failed because implement completed without the required output file, not because the bug was disproven or the fix failed.",
-        "immichFrame/ImmichFrame#617 failed at task admission because repo health check failed after selection, meaning the health gate was applied too late.",
-        "DioCrafts/OxiCloud#259 failed at pre_submit gate rather than during implementation, again indicating sequencing/gating issues."
-      ]
+        "DioCrafts/OxiCloud 已有 2 个 merged PR，merge rate 100%，且评审响应快",
+        "当前 Tier 2 也集中在少数仓库：pallets/jinja、MiniZinc/libminizinc"
+      ],
+      "implication": "后续应优先在已验证维护响应、规则清晰、无额外流程阻塞的仓库持续投递小型高确定性修复。"
     },
     {
-      "finding": "Selection quality degraded when hard gates were not enforced before ranking and admission.",
+      "pattern": "最近失败更多来自流程执行问题，而不是纯技术实现失败",
       "evidence": [
-        "The selected immichFrame task was later rejected by repo health, so it should never have reached task admission.",
-        "OxiCloud#251 looked attractive because of trust-repo bias, but its title contains 'enable', which conflicts with the oss-triage title-keyword hard reject."
-      ]
+        "OxiCloud#259 在 pre_submit 阶段 gate_failed",
+        "OxiCloud#252 implement 完成但缺少 required output",
+        "immichFrame/ImmichFrame#617 在 task_admission 阶段即因 repo health gate 被拦截"
+      ],
+      "implication": "当前主要瓶颈是任务选择和流程收口纪律，不是代码产出能力本身。"
     },
     {
-      "finding": "Trust-repo concentration is still strategically correct, but the candidate pool inside OxiCloud is currently noisy or poorly scoped.",
+      "pattern": "大量候选任务在真正实现前就已失效或被上游覆盖",
       "evidence": [
-        "OxiCloud remains the only Tier 1 repo with 2 merged PRs and 100% merge rate in trust-repos.md.",
-        "Historical strategy memory explicitly says OxiCloud has high recent capacity and should be maximized when valid issues exist. Source: memory/pr-strategy.md",
-        "However, recent OxiCloud attempts hit gate_failed (#259), missing required output (#252), and triage ambiguity (#251/#250), suggesting the current issue set is not producing clean admissions."
-      ]
-    },
-    {
-      "finding": "Bug-fix hunting is yielding lower-quality opportunities than docs/typo/test work in healthy repos.",
-      "evidence": [
-        "Long-term memory notes that many well-maintained repos have no clear open bugs, or the bugs are too complex/platform-specific. Source: MEMORY.md",
-        "Portfolio analysis shows estimated merge rates are much higher for docs fixes (~65%) and typo fixes (~70%) than bug fixes (~30%). Source: memory/pr-portfolio-analysis.md"
-      ]
+        "pr-ledger 中 6 条记录全部为 superseded / abandoned / already_fixed_upstream",
+        "最近历史记忆也显示多个候选 issue 已有现成 PR 或行为争议较大"
+      ],
+      "implication": "应提高 issue admission 门槛，减少对 stale / 已被他人处理 / 边界不清问题的投入。"
     }
   ],
-  "pattern_identified": {
-    "summary": "The current loop is failing primarily because gates are being applied out of order: candidates are discovered and even selected before all hard rejection checks are enforced, and implementation runs are not reliably writing the required result contract on every path.",
-    "root_causes": [
-      "Repo health checks are not consistently completed before final selection.",
-      "Title-keyword and scope hard rejects are not being enforced early enough during triage.",
-      "Implementation attempts do not always guarantee output-contract persistence on blocked or partial runs.",
-      "There is too much emphasis on finding bug fixes, even though current market conditions favor docs/typo/test contributions."
-    ]
-  },
+  "insights": [
+    "当前最有价值资产不是 issue 数量，而是 OxiCloud 这类已验证信任仓库的维护者关系与 merge 记录。",
+    "连续 3 次 failure 说明 idle 阶段不应急于重新开工，应先收紧 admission、implementation、pre-submit 三个关口。",
+    "repo health gate 是有效过滤器；像 immichFrame/ImmichFrame 这样的仓库应在更早阶段被排除，避免消耗实现周期。",
+    "被上游提前修复或被其他 PR 抢先，是近期最常见的机会损失来源，说明候选 issue 的 freshness 检查还不够严格。",
+    "Open PR 中，pallets/jinja 比 MiniZinc/libminizinc 更接近 secondary success，因为前者 CI passing，后者受外部 CI 阻塞。",
+    "工作队列里 ps2homebrew/Open-PS2-Loader#1689 已处于 waiting on maintainer，说明后续新增投稿应避免再进入维护反馈较慢或状态不明的仓库。"
+  ],
   "strategy_changes": [
     {
-      "change": "Move repo-health verification to discovery time and mark any unchecked repo as ineligible for selection.",
-      "why": "Prevents repeats of immichFrame#617, where a candidate was selected and only later rejected on admission."
+      "change": "将投递策略从‘发现更多候选’调整为‘优先复投信任仓库 + 少量高质量新仓探索’",
+      "actions": [
+        "未来一轮中至少 60-70% 的新任务优先来自 Tier 1/Tier 2 仓库或其近邻生态",
+        "只有当信任仓库缺少明确小型 issue 时，才扩展到新仓库"
+      ],
+      "expected_benefit": "提高 merge rate，减少在陌生仓库上的 admission 和 review 风险。"
     },
     {
-      "change": "Apply oss-triage hard rejects literally during candidate generation, especially title-keyword and feature-boundary filters.",
-      "why": "Prevents borderline tasks like OxiCloud#251 from surfacing as top candidates when the skill would later reject them."
+      "change": "在开始实现前增加 freshness 与 exclusivity 检查",
+      "actions": [
+        "确认 issue 最近 7 天内仍活跃",
+        "确认不存在已打开 PR、已合并修复或 maintainer 明示已有方案",
+        "优先选择明确可复现、争议小、变更面 < 100 LOC 的问题"
+      ],
+      "expected_benefit": "减少 superseded / already_fixed_upstream / abandoned 结果。"
     },
     {
-      "change": "Require every implement attempt to write the result contract immediately on entry and update it incrementally, even on failure/approval blocks.",
-      "why": "Prevents 'implement completed without required output' failures like OxiCloud#252."
+      "change": "把流程完整性交付设为硬门槛",
+      "actions": [
+        "implement 阶段结束前必须检查 required output 文件是否已写入",
+        "pre_submit 前必须完成 diff size、test evidence、output contract 三项自检",
+        "若 gate 失败，同仓库同轮不连续尝试第二个 issue，先复盘失败原因"
+      ],
+      "expected_benefit": "减少非技术性失败，避免把可 merge 的机会浪费在流程失误上。"
     },
     {
-      "change": "Temporarily rebalance discovery toward docs, typo, and test-addition tasks in healthy repos rather than insisting on bug fixes.",
-      "why": "Historical merge data strongly favors smaller non-bug contributions, and current bug inventory is low-signal. Source: memory/pr-portfolio-analysis.md#L29-L42"
-    },
-    {
-      "change": "Within OxiCloud, prefer only issues with explicit reproduction steps plus a likely repository-code fix path; skip release/distribution and vague integration issues unless a local root cause is quickly confirmable.",
-      "why": "Recent OxiCloud candidates have been fresh but operationally noisy, producing admission friction rather than compact code PRs."
-    },
-    {
-      "change": "Favor follow-up and trust-repo maintenance work when no fully gated new candidate exists.",
-      "why": "The strategy memory shows concentration on high-capacity trusted repos outperforms broad spraying. Source: memory/pr-strategy.md#L197-L205"
-    }
-  ],
-  "repos_to_deprioritize": [
-    {
-      "repo": "immichFrame/ImmichFrame",
-      "reason": "Failed repo health gate during task admission on issue #617, so it should not be selected again until a fresh health check passes and a clearly scoped issue is identified."
-    },
-    {
-      "repo": "DioCrafts/OxiCloud",
-      "reason": "Do not globally deprioritize, but temporarily deprioritize its current fresh issue set (#250, #251, #252, #259) until each candidate passes stricter pre-selection gates and shows a clean code-level path."
+      "change": "对新仓库启用更严格 admission policy",
+      "actions": [
+        "仅考虑 maintainer 活跃、最近提交频繁、PR backlog 低的仓库",
+        "优先 docs/typo/test，其次才是低风险 bugfix",
+        "拒绝边界含糊、可能被解释为 feature 的问题"
+      ],
+      "expected_benefit": "提高首个 PR 的通过率，更快建立新的 trust repo。"
     }
   ],
   "repos_to_prioritize": [
     {
       "repo": "DioCrafts/OxiCloud",
-      "reason": "Still the strongest trust repo overall: 2 merged PRs, 100% merge rate, fast maintainer response. Prioritize only fully gated, clearly scoped contributions. Source: workspace/memory/trust-repos.md"
+      "reason": "已验证 2 merged / 0 open / 100% merge rate，维护者响应快，是当前最强信任仓库。",
+      "recommended_focus": "仅挑选明确的小型 bug/docs/test 修复，并在 pre-submit 前严格执行 gate，避免流程性失误。"
     },
     {
       "repo": "pallets/jinja",
-      "reason": "Already has an open PR from us and remains an active healthy repo; maintaining trust and follow-up readiness here is higher leverage than low-confidence new repo expansion. Source: workspace/memory/trust-repos.md"
+      "reason": "已有 open PR #2154 且 CI passing，仓库体量大、维护成熟，具备成为下一信任仓库的潜力。",
+      "recommended_focus": "优先跟进现有 PR 状态；若需新增投稿，仅选择边界清晰的模板/过滤器类 bug 或 docs 小修。"
     },
     {
       "repo": "MiniZinc/libminizinc",
-      "reason": "Already in Tier 2 with an open PR, so it remains worth monitoring/follow-up rather than spending cycles on marginal new candidates. Source: workspace/memory/trust-repos.md"
+      "reason": "已有 open PR #1006，虽受 CI 阻塞，但仍是已建立上下文的仓库。",
+      "recommended_focus": "先观察/跟进现有 PR；除非有极小且独立的问题，否则不要在 CI 不稳定期叠加新投稿。"
+    },
+    {
+      "repo": "ps2homebrew/Open-PS2-Loader",
+      "reason": "work queue 中已有 #1689 且状态 clean、waiting on maintainer，说明已有一定上下文。",
+      "recommended_focus": "优先处理与现有上下文直接相关的 follow-up 或相邻小修，而不是全新陌生 issue。"
+    }
+  ],
+  "repos_to_deprioritize": [
+    {
+      "repo": "immichFrame/ImmichFrame",
+      "reason": "最近 task admission 已因 repo health gate failed，被证明不符合当前 merge-optimized 策略。"
+    },
+    {
+      "repo": "BerriAI/litellm",
+      "reason": "CLA blocked，且已在 deprioritized/avoid 列表中，应继续永久跳过。"
+    },
+    {
+      "repo": "dspy-ai/dspy",
+      "reason": "Anti-bot policy，非正常贡献路径成本高，应继续永久跳过。"
+    },
+    {
+      "repo": "browser-use/browser-use",
+      "reason": "4 open PRs，仓库已饱和，不利于快速建立高 merge-rate 记录。"
+    },
+    {
+      "repo": "vercel/ai",
+      "reason": "8 open PRs、0 merged，竞争拥挤且历史成功信号弱。"
+    },
+    {
+      "repo": "AstrBotDevs/AstrBot",
+      "reason": "近期 issue 已被上游修复，且在 avoid list 中，应避免继续投入。"
     }
   ]
 }
