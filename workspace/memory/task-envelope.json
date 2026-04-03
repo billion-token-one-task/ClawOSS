@@ -1,0 +1,70 @@
+{
+  "task_id": "select-DioCrafts-OxiCloud-259-20260403T2237Z",
+  "task_type": "implement",
+  "repo": "DioCrafts/OxiCloud",
+  "issue_number": 259,
+  "issue_title": "[BUG] Failed to create OIDC user: Invalid username",
+  "rationale": {
+    "selected_because": [
+      "It is the top-ranked candidate in the latest discovery output (score 18, priority 1).",
+      "DioCrafts/OxiCloud is the strongest trust repo: 2 merged PRs, 0 open PRs, 100% merge rate, and fast maintainer response.",
+      "The issue is fresh, unassigned, and in a repo pushed today, which maximizes first-responder advantage and merge probability.",
+      "Compared with other candidates, it best fits the current reflection guidance to deepen a high-trust repo rather than spread effort across weaker contexts."
+    ],
+    "why_not_others": [
+      "DioCrafts/OxiCloud#251 is also promising, but SSO enablement looks more likely to hide configuration ambiguity and broader validation scope than #259.",
+      "ps2homebrew/Open-PS2-Loader#1689 has decent signal, but domain-specific validation risk is higher and trust history is weaker than OxiCloud.",
+      "MiniZinc/libminizinc#1005 appears deeper and riskier, while the repo already has one CI-blocked open PR, making it a worse immediate bet.",
+      "nesalia-inc/core#200 is out of policy because it fails the star threshold despite being easy docs work."
+    ],
+    "alignment_with_strategy": [
+      "Matches the reflection recommendation to prioritize trusted repos with demonstrated fast review cycles.",
+      "Keeps effort on a small, high-confidence path instead of exploring lower-signal repositories.",
+      "Provides a clean next implementation target without adding multi-repo context switching overhead."
+    ]
+  },
+  "top_candidates": [
+    {
+      "rank": 1,
+      "repo": "DioCrafts/OxiCloud",
+      "issue_number": 259,
+      "title": "[BUG] Failed to create OIDC user: Invalid username",
+      "score": 18,
+      "decision": "selected"
+    },
+    {
+      "rank": 2,
+      "repo": "DioCrafts/OxiCloud",
+      "issue_number": 251,
+      "title": "[BUG] SSO doesn't enable",
+      "score": 16,
+      "decision": "backup"
+    },
+    {
+      "rank": 3,
+      "repo": "ps2homebrew/Open-PS2-Loader",
+      "issue_number": 1689,
+      "title": "fix(compat): add SLES-51114 audio compatibility settings",
+      "score": 14,
+      "decision": "backup"
+    }
+  ],
+  "risk_flags": [
+    {
+      "flag": "freshness_guard_required",
+      "detail": "Before implementation, re-check for linked PRs, new assignees, or maintainer comments to avoid another already-fixed/superseded miss."
+    },
+    {
+      "flag": "reproduction_risk",
+      "detail": "OIDC username validation may require environment-specific setup or identity-provider reproduction steps before a fix can be proven."
+    },
+    {
+      "flag": "process_discipline_required",
+      "detail": "This same repo had recent failures in pre_submit and implement stages, so output contract, test evidence, and diff-size checks must be enforced explicitly."
+    },
+    {
+      "flag": "bug_not_docs",
+      "detail": "This is a bugfix rather than an easy docs/typo win, so merge probability is lower than a trivial editorial fix even in a trusted repo."
+    }
+  ]
+}
