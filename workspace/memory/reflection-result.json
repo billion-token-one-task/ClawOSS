@@ -1,0 +1,93 @@
+{
+  "insights": [
+    {
+      "finding": "Recent failures were mostly process failures, not code-quality failures.",
+      "evidence": [
+        "DioCrafts/OxiCloud#252 failed because implement completed without the required output file, not because the bug was disproven or the fix failed.",
+        "immichFrame/ImmichFrame#617 failed at task admission because repo health check failed after selection, meaning the health gate was applied too late.",
+        "DioCrafts/OxiCloud#259 failed at pre_submit gate rather than during implementation, again indicating sequencing/gating issues."
+      ]
+    },
+    {
+      "finding": "Selection quality degraded when hard gates were not enforced before ranking and admission.",
+      "evidence": [
+        "The selected immichFrame task was later rejected by repo health, so it should never have reached task admission.",
+        "OxiCloud#251 looked attractive because of trust-repo bias, but its title contains 'enable', which conflicts with the oss-triage title-keyword hard reject."
+      ]
+    },
+    {
+      "finding": "Trust-repo concentration is still strategically correct, but the candidate pool inside OxiCloud is currently noisy or poorly scoped.",
+      "evidence": [
+        "OxiCloud remains the only Tier 1 repo with 2 merged PRs and 100% merge rate in trust-repos.md.",
+        "Historical strategy memory explicitly says OxiCloud has high recent capacity and should be maximized when valid issues exist. Source: memory/pr-strategy.md",
+        "However, recent OxiCloud attempts hit gate_failed (#259), missing required output (#252), and triage ambiguity (#251/#250), suggesting the current issue set is not producing clean admissions."
+      ]
+    },
+    {
+      "finding": "Bug-fix hunting is yielding lower-quality opportunities than docs/typo/test work in healthy repos.",
+      "evidence": [
+        "Long-term memory notes that many well-maintained repos have no clear open bugs, or the bugs are too complex/platform-specific. Source: MEMORY.md",
+        "Portfolio analysis shows estimated merge rates are much higher for docs fixes (~65%) and typo fixes (~70%) than bug fixes (~30%). Source: memory/pr-portfolio-analysis.md"
+      ]
+    }
+  ],
+  "pattern_identified": {
+    "summary": "The current loop is failing primarily because gates are being applied out of order: candidates are discovered and even selected before all hard rejection checks are enforced, and implementation runs are not reliably writing the required result contract on every path.",
+    "root_causes": [
+      "Repo health checks are not consistently completed before final selection.",
+      "Title-keyword and scope hard rejects are not being enforced early enough during triage.",
+      "Implementation attempts do not always guarantee output-contract persistence on blocked or partial runs.",
+      "There is too much emphasis on finding bug fixes, even though current market conditions favor docs/typo/test contributions."
+    ]
+  },
+  "strategy_changes": [
+    {
+      "change": "Move repo-health verification to discovery time and mark any unchecked repo as ineligible for selection.",
+      "why": "Prevents repeats of immichFrame#617, where a candidate was selected and only later rejected on admission."
+    },
+    {
+      "change": "Apply oss-triage hard rejects literally during candidate generation, especially title-keyword and feature-boundary filters.",
+      "why": "Prevents borderline tasks like OxiCloud#251 from surfacing as top candidates when the skill would later reject them."
+    },
+    {
+      "change": "Require every implement attempt to write the result contract immediately on entry and update it incrementally, even on failure/approval blocks.",
+      "why": "Prevents 'implement completed without required output' failures like OxiCloud#252."
+    },
+    {
+      "change": "Temporarily rebalance discovery toward docs, typo, and test-addition tasks in healthy repos rather than insisting on bug fixes.",
+      "why": "Historical merge data strongly favors smaller non-bug contributions, and current bug inventory is low-signal. Source: memory/pr-portfolio-analysis.md#L29-L42"
+    },
+    {
+      "change": "Within OxiCloud, prefer only issues with explicit reproduction steps plus a likely repository-code fix path; skip release/distribution and vague integration issues unless a local root cause is quickly confirmable.",
+      "why": "Recent OxiCloud candidates have been fresh but operationally noisy, producing admission friction rather than compact code PRs."
+    },
+    {
+      "change": "Favor follow-up and trust-repo maintenance work when no fully gated new candidate exists.",
+      "why": "The strategy memory shows concentration on high-capacity trusted repos outperforms broad spraying. Source: memory/pr-strategy.md#L197-L205"
+    }
+  ],
+  "repos_to_deprioritize": [
+    {
+      "repo": "immichFrame/ImmichFrame",
+      "reason": "Failed repo health gate during task admission on issue #617, so it should not be selected again until a fresh health check passes and a clearly scoped issue is identified."
+    },
+    {
+      "repo": "DioCrafts/OxiCloud",
+      "reason": "Do not globally deprioritize, but temporarily deprioritize its current fresh issue set (#250, #251, #252, #259) until each candidate passes stricter pre-selection gates and shows a clean code-level path."
+    }
+  ],
+  "repos_to_prioritize": [
+    {
+      "repo": "DioCrafts/OxiCloud",
+      "reason": "Still the strongest trust repo overall: 2 merged PRs, 100% merge rate, fast maintainer response. Prioritize only fully gated, clearly scoped contributions. Source: workspace/memory/trust-repos.md"
+    },
+    {
+      "repo": "pallets/jinja",
+      "reason": "Already has an open PR from us and remains an active healthy repo; maintaining trust and follow-up readiness here is higher leverage than low-confidence new repo expansion. Source: workspace/memory/trust-repos.md"
+    },
+    {
+      "repo": "MiniZinc/libminizinc",
+      "reason": "Already in Tier 2 with an open PR, so it remains worth monitoring/follow-up rather than spending cycles on marginal new candidates. Source: workspace/memory/trust-repos.md"
+    }
+  ]
+}
