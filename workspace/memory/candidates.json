@@ -1,0 +1,101 @@
+{
+  "candidates": [
+    {
+      "repo": "DioCrafts/OxiCloud",
+      "issue_number": 259,
+      "issue_url": "https://github.com/DioCrafts/OxiCloud/issues/259",
+      "title": "[BUG] Failed to create OIDC user: Invalid username",
+      "type": "bug",
+      "priority": 1,
+      "score": 18,
+      "why_high_signal": [
+        "Tier 1 trust repo with 2 merged PRs and 100% merge rate",
+        "Issue is fresh (2026-04-03)",
+        "Repo health looks strong: 2865 stars, pushed today, forks allowed",
+        "Unassigned and still open"
+      ],
+      "risks": [
+        "This repo had recent process failures on other issues, so execution discipline must be stricter",
+        "May require reproducing OIDC-specific setup before implementation"
+      ],
+      "recommended_next_step": "Perform freshness re-check for linked PRs/comments, then reproduce locally before committing to implementation."
+    },
+    {
+      "repo": "DioCrafts/OxiCloud",
+      "issue_number": 251,
+      "issue_url": "https://github.com/DioCrafts/OxiCloud/issues/251",
+      "title": "[BUG] SSO doesn't enable",
+      "type": "bug",
+      "priority": 2,
+      "score": 16,
+      "why_high_signal": [
+        "Same trusted repo advantage as OxiCloud#259",
+        "Fresh issue from 2026-04-02",
+        "Unassigned and labeled bug",
+        "High maintainer responsiveness historically"
+      ],
+      "risks": [
+        "SSO issues can hide configuration complexity",
+        "Could be harder to validate than a simpler UI or docs issue"
+      ],
+      "recommended_next_step": "Inspect issue discussion and code paths to confirm it is a scoped bugfix rather than a deployment/configuration support request."
+    },
+    {
+      "repo": "ps2homebrew/Open-PS2-Loader",
+      "issue_number": 1689,
+      "issue_url": "https://github.com/ps2homebrew/Open-PS2-Loader/issues/1689",
+      "title": "fix(compat): add SLES-51114 audio compatibility settings",
+      "type": "bug",
+      "priority": 3,
+      "score": 14,
+      "why_high_signal": [
+        "Already present in work_queue with mergeable_state: clean and waiting on maintainer",
+        "Repo health passes a quick check: 2837 stars, recent push, forks allowed",
+        "Issue appears scoped to a targeted compatibility fix"
+      ],
+      "risks": [
+        "Needs exclusivity check to ensure no active PR already covers the exact compatibility change",
+        "Domain-specific validation may require emulator or hardware knowledge"
+      ],
+      "recommended_next_step": "Check existing PRs/issue timeline for overlap, then assess whether the fix is a minimal data/config patch or requires deeper platform testing."
+    },
+    {
+      "repo": "nesalia-inc/core",
+      "issue_number": 200,
+      "issue_url": "https://github.com/nesalia-inc/core/issues/200",
+      "title": "Docs: Update API documentation",
+      "type": "docs",
+      "priority": 4,
+      "score": 6,
+      "why_high_signal": [
+        "Docs work is merge-friendly",
+        "Issue is labeled docs and ready"
+      ],
+      "risks": [
+        "Repo fails star threshold for mission fit (0 stars)",
+        "Not suitable under current discovery policy despite being easy"
+      ],
+      "recommended_next_step": "Do not implement unless mission policy is relaxed; keep only as a fallback example of an easy but out-of-policy issue."
+    },
+    {
+      "repo": "MiniZinc/libminizinc",
+      "issue_number": 1005,
+      "issue_url": "https://github.com/MiniZinc/libminizinc/issues/1005",
+      "title": "MiniZinc ignores overloads for Boolean counting constraints",
+      "type": "bug",
+      "priority": 5,
+      "score": 9,
+      "why_high_signal": [
+        "Existing Tier 2 trust context with an open PR already in the repo",
+        "Repo meets quick health screen: 672 stars, open issues enabled, forks allowed",
+        "Issue is unassigned and still open"
+      ],
+      "risks": [
+        "Repo push activity is older than stronger candidates",
+        "Current open PR is already CI-blocked, so adding another implementation may increase exposure to repo-side instability",
+        "Bug looks semantically deep, not a small guaranteed win"
+      ],
+      "recommended_next_step": "Keep as a lower-priority option only if simpler candidates dry up; prefer existing PR follow-up before new implementation here."
+    }
+  ]
+}
