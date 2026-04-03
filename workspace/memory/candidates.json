@@ -1,37 +1,18 @@
 {
   "candidates": [
     {
-      "repo": "DioCrafts/OxiCloud",
-      "issue_number": 251,
-      "issue_url": "https://github.com/DioCrafts/OxiCloud/issues/251",
-      "title": "[BUG] SSO doesn't enable",
-      "type": "bug",
-      "priority": 1,
-      "score": 16,
-      "why_high_signal": [
-        "Tier 1 trust repo with 2 merged PRs and 100% merge rate",
-        "Fresh issue from 2026-04-02",
-        "Unassigned, open, and labeled bug",
-        "Keeps effort inside the strongest known maintainer relationship while avoiding the specific issue that just gate-failed again"
-      ],
-      "risks": [
-        "SSO issues can hide configuration complexity",
-        "Could still require environment-specific reproduction or setup verification"
-      ],
-      "recommended_next_step": "Inspect issue discussion and code paths to confirm it is a scoped bugfix rather than a support/configuration request, then run a strict freshness and linked-PR check before implementation."
-    },
-    {
       "repo": "ps2homebrew/Open-PS2-Loader",
       "issue_number": 1689,
       "issue_url": "https://github.com/ps2homebrew/Open-PS2-Loader/issues/1689",
       "title": "fix(compat): add SLES-51114 audio compatibility settings",
       "type": "bug",
-      "priority": 2,
+      "priority": 1,
       "score": 14,
       "why_high_signal": [
         "Already present in work_queue with mergeable_state: clean and waiting on maintainer",
         "Repo health passes quick screening: 2837 stars, recent push, forks allowed",
-        "Issue appears narrowly scoped to a specific compatibility fix"
+        "Issue appears narrowly scoped to a specific compatibility fix",
+        "Avoids immediate reuse of OxiCloud issues after repeated recent implementation/admission failures"
       ],
       "risks": [
         "Needs exclusivity check to ensure no active PR already covers the exact compatibility change",
@@ -45,11 +26,11 @@
       "issue_url": "https://github.com/RAIT-09/obsidian-agent-client/issues/200",
       "title": "Stop can cause the next assistant reply to be swallowed/misordered until another user message is sent",
       "type": "bug",
-      "priority": 3,
+      "priority": 2,
       "score": 13,
       "why_high_signal": [
         "Repo clears quick health checks: 1455 stars, pushed today, forks allowed",
-        "Issue is fresh (2026-04-01), open, unassigned, and clearly framed as incorrect behavior",
+        "Issue is fresh, open, unassigned, and clearly framed as incorrect behavior",
         "Bug statement sounds reproducible and bounded to reply ordering / stop handling"
       ],
       "risks": [
@@ -64,7 +45,7 @@
       "issue_url": "https://github.com/MiniZinc/libminizinc/issues/1005",
       "title": "MiniZinc ignores overloads for Boolean counting constraints",
       "type": "bug",
-      "priority": 4,
+      "priority": 3,
       "score": 9,
       "why_high_signal": [
         "Existing Tier 2 trust context with an open PR already in the repo",
@@ -80,22 +61,40 @@
     },
     {
       "repo": "DioCrafts/OxiCloud",
+      "issue_number": 251,
+      "issue_url": "https://github.com/DioCrafts/OxiCloud/issues/251",
+      "title": "[BUG] SSO doesn't enable",
+      "type": "bug",
+      "priority": 4,
+      "score": 6,
+      "why_high_signal": [
+        "Still inside the strongest trust repo",
+        "Issue remains open and unassigned"
+      ],
+      "risks": [
+        "Now appears in failure-log as implement completed without required output",
+        "Issue description is weak and may conceal configuration/support ambiguity",
+        "Should not be retried immediately without new evidence or tighter execution discipline"
+      ],
+      "recommended_next_step": "Do not reselect immediately; only revisit after confirming stronger reproducibility evidence and enforcing a stricter implementation checklist."
+    },
+    {
+      "repo": "DioCrafts/OxiCloud",
       "issue_number": 259,
       "issue_url": "https://github.com/DioCrafts/OxiCloud/issues/259",
       "title": "[BUG] Failed to create OIDC user: Invalid username",
       "type": "bug",
       "priority": 5,
-      "score": 7,
+      "score": 5,
       "why_high_signal": [
         "Still in the strongest trust repo",
         "Fresh and unassigned"
       ],
       "risks": [
-        "This exact issue now has two recent gate failures in failure-log (pre_submit and task_admission)",
-        "Repeated retries without new evidence risk wasting cycle budget",
-        "OIDC-specific reproduction remains a setup risk"
+        "This exact issue has multiple recent gate failures in failure-log",
+        "Repeated retries without new evidence risk wasting cycle budget"
       ],
-      "recommended_next_step": "Do not select again immediately; only revisit if fresh evidence explains the gate failures or if other stronger candidates are exhausted."
+      "recommended_next_step": "Keep deprioritized until fresh evidence explains prior gate failures."
     }
   ]
 }
