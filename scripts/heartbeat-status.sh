@@ -4,6 +4,8 @@
 # Outputs JSON with: active sessions, open PRs, queue depth, lock files,
 #   wake state, scout status, PR monitor status, PR analyst status
 
+set -euo pipefail
+
 if [ "${1:-}" = "--help" ]; then
   echo "Usage: heartbeat-status.sh"
   echo "Quick status snapshot for heartbeat step 0."
@@ -12,9 +14,11 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/lib/path-helpers.sh"
+. "$SCRIPT_DIR/lib/github-rate-limit.sh"
 
 PROJECT_DIR="$(clawoss_resolve_project_dir "$0")"
 MEMORY_DIR="$PROJECT_DIR/workspace/memory"
+AGENT_USER="${GITHUB_USERNAME:-${CLAW_AGENT_USERNAME:-clawoss-bot}}"
 
 # Wake state (macOS grep doesn't support -P, use sed instead)
 WAKE_STATE=$(cat "$MEMORY_DIR/wake-state.md" 2>/dev/null || echo "unavailable")
@@ -24,7 +28,7 @@ ERRORS=$(echo "$WAKE_STATE" | sed -n 's/.*errors_this_hour: *\([0-9]*\).*/\1/p' 
 ERRORS=${ERRORS:-0}
 
 # Lock files
-LOCK_COUNT=$(ls "$MEMORY_DIR/locks/"*.lock 2>/dev/null | wc -l | tr -d ' ')
+LOCK_COUNT=$(find "$MEMORY_DIR/locks" -maxdepth 1 -type f -name '*.lock' 2>/dev/null | wc -l | tr -d ' ')
 
 # Queue depth
 QUEUE_DEPTH=$(grep -c '^\- \[' "$MEMORY_DIR/work-queue.md" 2>/dev/null || true)
@@ -35,15 +39,20 @@ STAGING_DEPTH=$(grep -c '^\- \[' "$MEMORY_DIR/work-queue-staging.md" 2>/dev/null
 STAGING_DEPTH=${STAGING_DEPTH:-0}
 
 # Open PRs
-OPEN_PRS=$(gh search prs --author BillionClaw --state open --json number --jq 'length' 2>/dev/null || echo 0)
+OPEN_PRS=$(gh_cached_search_prs 300 --author "$AGENT_USER" --state open --json number --jq 'length' 2>/dev/null || echo 0)
 
 # Scout status
 SCOUT_STATUS="unknown"
 SCOUT_REPORT=""
-LATEST_SCOUT=$(ls -t "$MEMORY_DIR"/scout-report-*.md 2>/dev/null | head -1)
+LATEST_SCOUT=$(find "$MEMORY_DIR" -maxdepth 1 -type f -name 'scout-report-*.md' -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -1 | cut -d' ' -f2-)
 if [ -n "$LATEST_SCOUT" ]; then
   MTIME=$(stat -f %m "$LATEST_SCOUT" 2>/dev/null || stat -c %Y "$LATEST_SCOUT" 2>/dev/null || echo 0)
-  [ "$MTIME" -eq 0 ] 2>/dev/null && SCOUT_AGE_MIN=9999 || SCOUT_AGE_MIN=$(( ($(date +%s) - MTIME) / 60 ))
+  if [ -z "${MTIME:-}" ] || ! [[ "$MTIME" =~ ^[0-9]+$ ]] || [ "$MTIME" -eq 0 ]; then
+    SCOUT_AGE_MIN=9999
+  else
+    NOW_TS=$(date +%s)
+    SCOUT_AGE_MIN=$(( (NOW_TS - MTIME) / 60 ))
+  fi
   if [ "$SCOUT_AGE_MIN" -lt 30 ]; then
     SCOUT_STATUS="active"
   else
@@ -58,7 +67,12 @@ fi
 MONITOR_STATUS="unknown"
 if [ -f "$MEMORY_DIR/pr-monitor-report.md" ]; then
   MTIME=$(stat -f %m "$MEMORY_DIR/pr-monitor-report.md" 2>/dev/null || stat -c %Y "$MEMORY_DIR/pr-monitor-report.md" 2>/dev/null || echo 0)
-  [ "$MTIME" -eq 0 ] 2>/dev/null && MONITOR_AGE_MIN=9999 || MONITOR_AGE_MIN=$(( ($(date +%s) - MTIME) / 60 ))
+  if [ -z "${MTIME:-}" ] || ! [[ "$MTIME" =~ ^[0-9]+$ ]] || [ "$MTIME" -eq 0 ]; then
+    MONITOR_AGE_MIN=9999
+  else
+    NOW_TS=$(date +%s)
+    MONITOR_AGE_MIN=$(( (NOW_TS - MTIME) / 60 ))
+  fi
   if [ "$MONITOR_AGE_MIN" -lt 30 ]; then
     MONITOR_STATUS="active"
   else
@@ -72,7 +86,12 @@ fi
 ANALYST_STATUS="unknown"
 if [ -f "$MEMORY_DIR/pr-strategy.md" ]; then
   MTIME=$(stat -f %m "$MEMORY_DIR/pr-strategy.md" 2>/dev/null || stat -c %Y "$MEMORY_DIR/pr-strategy.md" 2>/dev/null || echo 0)
-  [ "$MTIME" -eq 0 ] 2>/dev/null && ANALYST_AGE_MIN=9999 || ANALYST_AGE_MIN=$(( ($(date +%s) - MTIME) / 60 ))
+  if [ -z "${MTIME:-}" ] || ! [[ "$MTIME" =~ ^[0-9]+$ ]] || [ "$MTIME" -eq 0 ]; then
+    ANALYST_AGE_MIN=9999
+  else
+    NOW_TS=$(date +%s)
+    ANALYST_AGE_MIN=$(( (NOW_TS - MTIME) / 60 ))
+  fi
   if [ "$ANALYST_AGE_MIN" -lt 30 ]; then
     ANALYST_STATUS="active"
   else
