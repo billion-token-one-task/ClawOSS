@@ -1,122 +1,70 @@
 {
-  "pattern_identified": [
+  "insights": {
+    "summary": "Recent failures continue to cluster around admission discipline, output-contract compliance, and pre-submit guardrails rather than candidate quality or repo selection quality.",
+    "evidence": [
+      "Multiple failures were caused by implement runs completing without required output artifacts.",
+      "Several OxiCloud attempts failed on pre-submit and task-admission gates rather than on repository responsiveness or lack of mergeability.",
+      "OxiCloud remains the only Tier 1 trust repo with 2 merged PRs, 0 open backlog, and fast maintainer response, so current evidence does not support pool replacement.",
+      "Recent discover/select cycles repeatedly converged on the same stable ranking, indicating candidate-pool stability rather than search failure caused by poor ranking.",
+      "The environment still lacks a successful live query path, so no fresh external evidence exists that would justify widening or reranking the pool."
+    ]
+  },
+  "pattern_identified": {
+    "primary": "admission_and_process_reliability_failures_dominate",
+    "secondary": [
+      "required_output_compliance_failures",
+      "pre_submit_gate_failures",
+      "task_framing_drift",
+      "record_consistency_drift",
+      "environment_and_approval_friction"
+    ],
+    "interpretation_of_consecutive_failures": "process-warning threshold, not candidate-pool invalidation",
+    "pool_reset_required": false,
+    "execution_constriction_required": false
+  },
+  "strategy_changes": {
+    "frontline": "Keep DioCrafts/OxiCloud#241 as the selected candidate.",
+    "fallback": "If OxiCloud#241 fails strict admission or preflight, switch directly to MiniZinc/libminizinc#1005.",
+    "process_changes": [
+      "Treat output-contract compliance as a first-class gate before and after each work unit.",
+      "Require strict admission immediately before implementation: verify issue still open, unsuperseded, not already fixed upstream, and still within mission scope.",
+      "Require mandatory preflight before coding: approved branch prefix, required output path lock, forbidden-path isolation, and diff budget under 200 lines.",
+      "Do not use consecutive_failures as a reason to rerank, widen the pool, or relax gates.",
+      "Avoid opportunistic retries on nearby OxiCloud issues if the selected issue fails admission; switch to the vetted fallback instead."
+    ],
+    "note": "The corrective action is process tightening, not pool replacement."
+  },
+  "repos_to_deprioritize": [
     {
-      "pattern": "最高成功率来自少量已建立信任的仓库，而不是广撒网式探索",
-      "evidence": [
-        "DioCrafts/OxiCloud 已有 2 个 merged PR，merge rate 100%，且评审响应快",
-        "当前 Tier 2 也集中在少数仓库：pallets/jinja、MiniZinc/libminizinc"
-      ],
-      "implication": "后续应优先在已验证维护响应、规则清晰、无额外流程阻塞的仓库持续投递小型高确定性修复。"
+      "repo": "pallets/jinja",
+      "reason": "Keep as reserve/occupied-reserve until the #2145 / #2154 / PR #2155 record inconsistency is explicitly revalidated."
     },
     {
-      "pattern": "最近失败更多来自流程执行问题，而不是纯技术实现失败",
-      "evidence": [
-        "OxiCloud#259 在 pre_submit 阶段 gate_failed",
-        "OxiCloud#252 implement 完成但缺少 required output",
-        "immichFrame/ImmichFrame#617 在 task_admission 阶段即因 repo health gate 被拦截"
-      ],
-      "implication": "当前主要瓶颈是任务选择和流程收口纪律，不是代码产出能力本身。"
+      "repo": "RAIT-09/obsidian-agent-client",
+      "reason": "Historical branch-prefix/runtime friction makes it weaker than the current vetted top options."
     },
     {
-      "pattern": "大量候选任务在真正实现前就已失效或被上游覆盖",
-      "evidence": [
-        "pr-ledger 中 6 条记录全部为 superseded / abandoned / already_fixed_upstream",
-        "最近历史记忆也显示多个候选 issue 已有现成 PR 或行为争议较大"
-      ],
-      "implication": "应提高 issue admission 门槛，减少对 stale / 已被他人处理 / 边界不清问题的投入。"
-    }
-  ],
-  "insights": [
-    "当前最有价值资产不是 issue 数量，而是 OxiCloud 这类已验证信任仓库的维护者关系与 merge 记录。",
-    "连续 3 次 failure 说明 idle 阶段不应急于重新开工，应先收紧 admission、implementation、pre-submit 三个关口。",
-    "repo health gate 是有效过滤器；像 immichFrame/ImmichFrame 这样的仓库应在更早阶段被排除，避免消耗实现周期。",
-    "被上游提前修复或被其他 PR 抢先，是近期最常见的机会损失来源，说明候选 issue 的 freshness 检查还不够严格。",
-    "Open PR 中，pallets/jinja 比 MiniZinc/libminizinc 更接近 secondary success，因为前者 CI passing，后者受外部 CI 阻塞。",
-    "工作队列里 ps2homebrew/Open-PS2-Loader#1689 已处于 waiting on maintainer，说明后续新增投稿应避免再进入维护反馈较慢或状态不明的仓库。"
-  ],
-  "strategy_changes": [
-    {
-      "change": "将投递策略从‘发现更多候选’调整为‘优先复投信任仓库 + 少量高质量新仓探索’",
-      "actions": [
-        "未来一轮中至少 60-70% 的新任务优先来自 Tier 1/Tier 2 仓库或其近邻生态",
-        "只有当信任仓库缺少明确小型 issue 时，才扩展到新仓库"
-      ],
-      "expected_benefit": "提高 merge rate，减少在陌生仓库上的 admission 和 review 风险。"
-    },
-    {
-      "change": "在开始实现前增加 freshness 与 exclusivity 检查",
-      "actions": [
-        "确认 issue 最近 7 天内仍活跃",
-        "确认不存在已打开 PR、已合并修复或 maintainer 明示已有方案",
-        "优先选择明确可复现、争议小、变更面 < 100 LOC 的问题"
-      ],
-      "expected_benefit": "减少 superseded / already_fixed_upstream / abandoned 结果。"
-    },
-    {
-      "change": "把流程完整性交付设为硬门槛",
-      "actions": [
-        "implement 阶段结束前必须检查 required output 文件是否已写入",
-        "pre_submit 前必须完成 diff size、test evidence、output contract 三项自检",
-        "若 gate 失败，同仓库同轮不连续尝试第二个 issue，先复盘失败原因"
-      ],
-      "expected_benefit": "减少非技术性失败，避免把可 merge 的机会浪费在流程失误上。"
-    },
-    {
-      "change": "对新仓库启用更严格 admission policy",
-      "actions": [
-        "仅考虑 maintainer 活跃、最近提交频繁、PR backlog 低的仓库",
-        "优先 docs/typo/test，其次才是低风险 bugfix",
-        "拒绝边界含糊、可能被解释为 feature 的问题"
-      ],
-      "expected_benefit": "提高首个 PR 的通过率，更快建立新的 trust repo。"
+      "repo": "ps2homebrew/Open-PS2-Loader",
+      "reason": "Outside current preferred path due to prior admission rejection and lower confidence fit."
     }
   ],
   "repos_to_prioritize": [
     {
       "repo": "DioCrafts/OxiCloud",
-      "reason": "已验证 2 merged / 0 open / 100% merge rate，维护者响应快，是当前最强信任仓库。",
-      "recommended_focus": "仅挑选明确的小型 bug/docs/test 修复，并在 pre-submit 前严格执行 gate，避免流程性失误。"
-    },
-    {
-      "repo": "pallets/jinja",
-      "reason": "已有 open PR #2154 且 CI passing，仓库体量大、维护成熟，具备成为下一信任仓库的潜力。",
-      "recommended_focus": "优先跟进现有 PR 状态；若需新增投稿，仅选择边界清晰的模板/过滤器类 bug 或 docs 小修。"
+      "reason": "Only Tier 1 trust repo; 2 merged PRs, 0 open backlog, 100% observed merge rate, fast maintainer response."
     },
     {
       "repo": "MiniZinc/libminizinc",
-      "reason": "已有 open PR #1006，虽受 CI 阻塞，但仍是已建立上下文的仓库。",
-      "recommended_focus": "先观察/跟进现有 PR；除非有极小且独立的问题，否则不要在 CI 不稳定期叠加新投稿。"
+      "reason": "Best current fallback if OxiCloud#241 fails strict admission or preflight."
     },
     {
-      "repo": "ps2homebrew/Open-PS2-Loader",
-      "reason": "work queue 中已有 #1689 且状态 clean、waiting on maintainer，说明已有一定上下文。",
-      "recommended_focus": "优先处理与现有上下文直接相关的 follow-up 或相邻小修，而不是全新陌生 issue。"
+      "repo": "Textualize/rich",
+      "reason": "Useful low-diff reserve path for a safe small contribution if frontline and fallback paths are blocked."
     }
   ],
-  "repos_to_deprioritize": [
-    {
-      "repo": "immichFrame/ImmichFrame",
-      "reason": "最近 task admission 已因 repo health gate failed，被证明不符合当前 merge-optimized 策略。"
-    },
-    {
-      "repo": "BerriAI/litellm",
-      "reason": "CLA blocked，且已在 deprioritized/avoid 列表中，应继续永久跳过。"
-    },
-    {
-      "repo": "dspy-ai/dspy",
-      "reason": "Anti-bot policy，非正常贡献路径成本高，应继续永久跳过。"
-    },
-    {
-      "repo": "browser-use/browser-use",
-      "reason": "4 open PRs，仓库已饱和，不利于快速建立高 merge-rate 记录。"
-    },
-    {
-      "repo": "vercel/ai",
-      "reason": "8 open PRs、0 merged，竞争拥挤且历史成功信号弱。"
-    },
-    {
-      "repo": "AstrBotDevs/AstrBot",
-      "reason": "近期 issue 已被上游修复，且在 avoid list 中，应避免继续投入。"
-    }
-  ]
+  "recommended_next_action": {
+    "frontline": "Keep DioCrafts/OxiCloud#241 as the selected candidate.",
+    "fallback": "If OxiCloud#241 fails strict admission or preflight, switch directly to MiniZinc/libminizinc#1005.",
+    "note": "Do not interpret consecutive_failures=3 as candidate-pool invalidation; treat it as a process-warning threshold only."
+  }
 }

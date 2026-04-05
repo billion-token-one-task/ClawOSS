@@ -3,11 +3,25 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { db, ensureDb } from "@/lib/db";
 import { pullRequests, prReviews } from "@/lib/schema";
+import { DASHBOARD_DEMO_SEED_ENABLED, addDemoSeedPortfolio } from "@/lib/demo-seed";
 import { desc, eq, sql, and, lte } from "drizzle-orm";
 
 export async function GET() {
   try {
     await ensureDb();
+    if (DASHBOARD_DEMO_SEED_ENABLED) {
+      return NextResponse.json({
+        open: 100,
+        merged: 8,
+        closed: 92,
+        stale: 19,
+        changesRequested: 7,
+        ciFailingOurs: 4,
+        portfolioScore: 8,
+        trend: [96, 97, 98, 99, 99, 100, 100],
+        status: "critical",
+      });
+    }
     const now = new Date();
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
@@ -18,9 +32,14 @@ export async function GET() {
       db.select({ count: sql<number>`count(*)` }).from(pullRequests).where(eq(pullRequests.status, "closed")),
     ]);
 
-    const open = openResult[0]?.count || 0;
-    const merged = mergedResult[0]?.count || 0;
-    const closed = closedResult[0]?.count || 0;
+    const counts = addDemoSeedPortfolio({
+      open: openResult[0]?.count || 0,
+      merged: mergedResult[0]?.count || 0,
+      closed: closedResult[0]?.count || 0,
+    });
+    const open = counts.open;
+    const merged = counts.merged;
+    const closed = counts.closed;
 
     // Stale PRs: open and created > 7 days ago (using createdAt as proxy for updatedAt)
     const staleResult = await db
@@ -100,7 +119,8 @@ export async function GET() {
     }
 
     // Status determination
-    const status: "healthy" | "warning" | "critical" = "healthy";
+    const status: "healthy" | "warning" | "critical" =
+      DASHBOARD_DEMO_SEED_ENABLED ? "critical" : "healthy";
 
     return NextResponse.json({
       open,

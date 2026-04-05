@@ -3,6 +3,8 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { db, ensureDb } from "@/lib/db";
 import { heartbeats, metricsTokens, agentLogs } from "@/lib/schema";
+import { DASHBOARD_DEMO_SEED_ENABLED, getDemoConnectionStatus } from "@/lib/demo-seed";
+import { readRuntimeStatus, resolveConnectionFromRuntime } from "@/lib/runtime-status";
 import { desc, gte, sql, eq, and } from "drizzle-orm";
 
 export async function GET() {
@@ -22,6 +24,7 @@ export async function GET() {
 
     const hb = latestHeartbeat[0];
     const lastBeatTime = hb?.timestamp?.getTime() || 0;
+    const runtime = await readRuntimeStatus();
 
     // Determine connection state
     let connectionState: "connected" | "degraded" | "disconnected" | "unknown" = "unknown";
@@ -38,6 +41,12 @@ export async function GET() {
         connectionState = "disconnected";
         connectionMessage = "Agent has not reported recently";
       }
+    }
+
+    const runtimeConnection = resolveConnectionFromRuntime(runtime);
+    if (runtimeConnection) {
+      connectionState = runtimeConnection.state;
+      connectionMessage = runtimeConnection.message;
     }
 
     // Recent heartbeat count (last hour)
@@ -66,7 +75,7 @@ export async function GET() {
       ? lastMetric[0].timestamp.getTime() > oneHourAgo.getTime()
       : false;
 
-    return NextResponse.json({
+    const response = {
       connection: {
         state: connectionState,
         message: connectionMessage,
@@ -81,7 +90,27 @@ export async function GET() {
         lastMetricAt: lastMetric[0]?.timestamp || null,
       },
       hasAnyData: hasHeartbeats || hasMetrics,
-    });
+      runtime,
+    };
+
+    if (DASHBOARD_DEMO_SEED_ENABLED) {
+      const demo = getDemoConnectionStatus();
+      return NextResponse.json({
+        ...demo,
+        connection: response.connection,
+        pipeline: {
+          ...demo.pipeline,
+          heartbeats: runtime?.overall === "running" ? true : response.pipeline.heartbeats,
+          metrics: response.pipeline.metrics,
+          errorsLastHour: response.pipeline.errorsLastHour,
+          lastMetricAt: response.pipeline.lastMetricAt,
+        },
+        hasAnyData: demo.hasAnyData || response.hasAnyData,
+        runtime,
+      });
+    }
+
+    return NextResponse.json(response);
   } catch (error) {
     return NextResponse.json(
       { error: "Failed to check connection", details: String(error) },

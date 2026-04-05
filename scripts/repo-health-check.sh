@@ -10,6 +10,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+. "$SCRIPT_DIR/lib/github-rate-limit.sh"
 
 if [ $# -lt 1 ]; then
   echo '{"error": "Usage: repo-health-check.sh owner/repo [threshold]"}' >&2
@@ -71,7 +72,7 @@ ENDJSON
 }
 
 # ─── Single repo metadata call (stars, pushed_at, description, topics, archived) ───
-REPO_DATA=$(gh api "repos/${REPO}" --jq '{
+REPO_DATA=$(gh_cached_api 1800 "repos/${REPO}" --jq '{
   stars: .stargazers_count,
   pushed_at: .pushed_at,
   description: (.description // ""),
@@ -129,7 +130,7 @@ fi
 score=$((score + 1))
 
 # ─── 3. Merged PRs in last 30 days ───
-RECENT_MERGES=$(gh api "repos/${REPO}/pulls?state=closed&sort=updated&direction=desc&per_page=50" \
+RECENT_MERGES=$(gh_cached_api 1800 "repos/${REPO}/pulls?state=closed&sort=updated&direction=desc&per_page=50" \
   --jq "[.[] | select(.merged_at != null and .merged_at > \"$THIRTY_DAYS_AGO\")] | length" 2>/dev/null || echo "0")
 
 if [ "$RECENT_MERGES" -eq 0 ]; then
@@ -147,7 +148,7 @@ fi
 # ─── 3b. Average days to merge (from last 10 merged PRs) ───
 # Uses Python for correct date math across month/year boundaries
 AVG_MERGE_DAYS=0
-MERGE_DATA=$(gh api "repos/${REPO}/pulls?state=closed&sort=updated&direction=desc&per_page=10" \
+MERGE_DATA=$(gh_cached_api 1800 "repos/${REPO}/pulls?state=closed&sort=updated&direction=desc&per_page=10" \
   --jq '[.[] | select(.merged_at != null) | {created: .created_at, merged: .merged_at}]' 2>/dev/null || echo "[]")
 
 if [ "$MERGE_DATA" != "[]" ]; then
@@ -195,7 +196,7 @@ elif [ "$AVG_MERGE_DAYS" -le 14 ]; then
 fi
 
 # ─── 4. Open PR backlog (use search API for accurate count beyond 100) ───
-OPEN_PRS=$(gh api "/search/issues?q=is:pr+is:open+repo:${REPO}&per_page=1" --jq '.total_count' 2>/dev/null || echo "0")
+OPEN_PRS=$(gh_cached_api 600 "/search/issues?q=is:pr+is:open+repo:${REPO}&per_page=1" --jq '.total_count' 2>/dev/null || echo "0")
 # Tiered PR limits: relaxed for large repos
 if [ "$STARS" -ge 20000 ]; then
   PR_LIMIT=1000  # mega-repos (vllm, langchain, transformers) have huge PR volume
@@ -219,13 +220,13 @@ fi
 # 5 is enough signal while halving the API budget for this section.
 TOTAL_PRS=0
 REVIEWED_PRS=0
-MERGED_PR_NUMBERS=$(gh api "repos/${REPO}/pulls?state=closed&sort=updated&direction=desc&per_page=5" \
+MERGED_PR_NUMBERS=$(gh_cached_api 1800 "repos/${REPO}/pulls?state=closed&sort=updated&direction=desc&per_page=5" \
   --jq '[.[] | select(.merged_at != null)] | .[0:5] | .[].number' 2>/dev/null || echo "")
 
 if [ -n "$MERGED_PR_NUMBERS" ]; then
   for PR_NUM in $MERGED_PR_NUMBERS; do
     TOTAL_PRS=$((TOTAL_PRS + 1))
-    REVIEW_COUNT=$(gh api "repos/${REPO}/pulls/${PR_NUM}/reviews" --jq 'length' 2>/dev/null || echo "0")
+    REVIEW_COUNT=$(gh_cached_api 1800 "repos/${REPO}/pulls/${PR_NUM}/reviews" --jq 'length' 2>/dev/null || echo "0")
     if [ "$REVIEW_COUNT" -gt 0 ]; then
       REVIEWED_PRS=$((REVIEWED_PRS + 1))
     fi
@@ -258,7 +259,7 @@ else
 fi
 
 # ─── 6. External contributor merges (do they merge outside PRs?) ───
-EXTERNAL_MERGES=$(gh api "repos/${REPO}/pulls?state=closed&sort=updated&direction=desc&per_page=30" \
+EXTERNAL_MERGES=$(gh_cached_api 1800 "repos/${REPO}/pulls?state=closed&sort=updated&direction=desc&per_page=30" \
   --jq '[.[] | select(.merged_at != null)] | [.[] | select(.author_association != "OWNER" and .author_association != "MEMBER" and .author_association != "COLLABORATOR")] | length' 2>/dev/null || echo "0")
 
 if [ "$EXTERNAL_MERGES" -gt 0 ]; then
@@ -268,7 +269,7 @@ else
 fi
 
 # ─── 7. CONTRIBUTING.md check (welcoming signal + anti-bot detection) ───
-CONTRIBUTING=$(gh api "repos/${REPO}/contents/CONTRIBUTING.md" --jq '.content' 2>/dev/null || echo "")
+CONTRIBUTING=$(gh_cached_api 21600 "repos/${REPO}/contents/CONTRIBUTING.md" --jq '.content' 2>/dev/null || echo "")
 HAS_CONTRIBUTING=false
 ANTI_BOT=false
 if [ -n "$CONTRIBUTING" ]; then
@@ -301,11 +302,11 @@ for org in $AUTOMATABLE_CLA_ORGS; do
   if [ "$OWNER" = "$org" ]; then HAS_CLA=true; break; fi
 done
 if [ "$HAS_CLA" = "false" ]; then
-  CLABOT=$(gh api "repos/${REPO}/contents/.clabot" --jq '.content' 2>/dev/null || echo "")
+  CLABOT=$(gh_cached_api 21600 "repos/${REPO}/contents/.clabot" --jq '.content' 2>/dev/null || echo "")
   [ -n "$CLABOT" ] && HAS_CLA=true
 fi
 if [ "$HAS_CLA" = "false" ]; then
-  CLA_ACTION=$(gh api "repos/${REPO}/contents/.github/workflows" \
+  CLA_ACTION=$(gh_cached_api 21600 "repos/${REPO}/contents/.github/workflows" \
     --jq '[.[] | select(.name | test("cla|dco"; "i"))] | length' 2>/dev/null || echo "0")
   [ "$CLA_ACTION" -gt 0 ] && HAS_CLA=true
 fi
@@ -326,12 +327,12 @@ for kw in agent agentic llm "large language model" rag "retrieval augmented" emb
 done
 
 # ─── 10. Bot-friendly signals ───
-HAS_CI=$(gh api "repos/${REPO}/contents/.github/workflows" --jq 'length' 2>/dev/null || echo "0")
+HAS_CI=$(gh_cached_api 21600 "repos/${REPO}/contents/.github/workflows" --jq 'length' 2>/dev/null || echo "0")
 if [ "$HAS_CI" -gt 0 ]; then
   score=$((score + 1))
 fi
 
-GFI_COUNT=$(gh api "repos/${REPO}/labels" --jq '[.[] | select(.name == "good first issue" or .name == "good-first-issue" or .name == "help wanted" or .name == "help-wanted")] | length' 2>/dev/null || echo "0")
+GFI_COUNT=$(gh_cached_api 21600 "repos/${REPO}/labels" --jq '[.[] | select(.name == "good first issue" or .name == "good-first-issue" or .name == "help wanted" or .name == "help-wanted")] | length' 2>/dev/null || echo "0")
 if [ "$GFI_COUNT" -gt 0 ]; then
   score=$((score + 2))
 fi

@@ -8,6 +8,7 @@ REPO="${1:?Usage: compute-merge-probability.sh <owner/repo> <issue_number> [--ty
 ISSUE="${2:?Usage: compute-merge-probability.sh <owner/repo> <issue_number>}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/lib/path-helpers.sh"
+. "$SCRIPT_DIR/lib/github-rate-limit.sh"
 
 PROJECT_DIR="$(clawoss_resolve_project_dir "$0")"
 TYPE="fix"
@@ -47,7 +48,7 @@ case "$TYPE" in
 esac
 
 # ─── 2. Size estimate from issue body length (0-100, smaller = better) ───
-BODY_LEN=$(gh api "repos/${REPO}/issues/${ISSUE}" --jq '.body | length' 2>/dev/null || echo 500)
+BODY_LEN=$(gh_cached_api 1800 "repos/${REPO}/issues/${ISSUE}" --jq '.body | length' 2>/dev/null || echo 500)
 if [ "$BODY_LEN" -lt 200 ]; then
   S_SIZE=90
 elif [ "$BODY_LEN" -lt 1000 ]; then
@@ -59,7 +60,7 @@ else
 fi
 
 # ─── 3. Repo responsiveness (0-100) ───
-AVG_COMMENTS=$(gh api "repos/${REPO}/issues?state=closed&per_page=5&sort=updated" --jq '[.[].comments] | add / length' 2>/dev/null || echo 0)
+AVG_COMMENTS=$(gh_cached_api 1800 "repos/${REPO}/issues?state=closed&per_page=5&sort=updated" --jq '[.[].comments] | add / length' 2>/dev/null || echo 0)
 if python3 -c "exit(0 if float('${AVG_COMMENTS:-0}') > 3 else 1)" 2>/dev/null; then
   S_RESPONSIVE=85
 elif python3 -c "exit(0 if float('${AVG_COMMENTS:-0}') > 1 else 1)" 2>/dev/null; then
@@ -85,7 +86,7 @@ if [ -f "$TRUST_FILE" ]; then
 fi
 
 # ─── 5. Freshness score (0-100) ───
-CREATED_AT=$(gh api "repos/${REPO}/issues/${ISSUE}" --jq '.created_at' 2>/dev/null || echo "")
+CREATED_AT=$(gh_cached_api 1800 "repos/${REPO}/issues/${ISSUE}" --jq '.created_at' 2>/dev/null || echo "")
 S_FRESH=50
 if [ -n "$CREATED_AT" ]; then
   CREATED_TS=$(date -jf "%Y-%m-%dT%H:%M:%SZ" "$CREATED_AT" +%s 2>/dev/null || date -d "$CREATED_AT" +%s 2>/dev/null || python3 -c "from datetime import datetime; print(int(datetime.fromisoformat('${CREATED_AT}'.replace('Z','+00:00')).timestamp()))" 2>/dev/null || echo 0)
@@ -99,13 +100,14 @@ if [ -n "$CREATED_AT" ]; then
 fi
 
 # ─── 6. Contributor fit (0-100) ───
-PREV_PRS=$(gh search prs --author BillionClaw --repo "$REPO" "is:merged" --json number --jq 'length' 2>/dev/null || echo 0)
+AGENT_USER="${GITHUB_USERNAME:-${CLAW_AGENT_USERNAME:-clawoss-bot}}"
+PREV_PRS=$(gh_cached_search_prs 3600 --author "$AGENT_USER" --repo "$REPO" "is:merged" --json number --jq 'length' 2>/dev/null || echo 0)
 if [ "$PREV_PRS" -gt 2 ]; then S_FIT=95
 elif [ "$PREV_PRS" -gt 0 ]; then S_FIT=80
 else S_FIT=50; fi
 
 # ─── 7. Competition (0-100) ───
-OPEN_PRS=$(gh api "repos/${REPO}/issues/${ISSUE}/timeline" --jq '[.[] | select(.event=="cross-referenced") | .source.issue | select(.pull_request != null and .state == "open")] | length' 2>/dev/null || echo 0)
+OPEN_PRS=$(gh_cached_api 900 "repos/${REPO}/issues/${ISSUE}/timeline" --jq '[.[] | select(.event=="cross-referenced") | .source.issue | select(.pull_request != null and .state == "open")] | length' 2>/dev/null || echo 0)
 if [ "$OPEN_PRS" -eq 0 ]; then S_COMP=95
 elif [ "$OPEN_PRS" -eq 1 ]; then S_COMP=40
 else S_COMP=10; fi

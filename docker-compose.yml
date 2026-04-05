@@ -12,7 +12,7 @@ services:
       TURSO_DATABASE_URL: file:/data/clawoss.db
       CLAWOSS_WORKSPACE_DIR: /workspace
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3300:3000"
     volumes:
       - clawoss_db:/data
       - ./workspace:/workspace

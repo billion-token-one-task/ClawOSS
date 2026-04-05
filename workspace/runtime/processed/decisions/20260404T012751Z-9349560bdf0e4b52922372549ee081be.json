@@ -1,0 +1,20 @@
+{
+  "timestamp": "2026-04-04T01:27:51Z",
+  "stage": "repo_health_gate",
+  "sessionId": null,
+  "strategyVersion": "bootstrap-v1",
+  "repo": null,
+  "issueNumber": null,
+  "prNumber": null,
+  "selected": false,
+  "score": 0,
+  "confidence": null,
+  "expectedMergeProb": null,
+  "expectedTokenCost": null,
+  "reasoningSummary": "cannot fetch repo metadata",
+  "candidateSet": null,
+  "metadata": {
+    "failure_category": "tool_error: gh api repos/ failed",
+    "threshold": 5
+  }
+}

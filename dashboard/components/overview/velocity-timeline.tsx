@@ -269,7 +269,7 @@ export function VelocityTimeline() {
                 {summary.mergeRatio}%
               </span>
               <span className="text-muted-foreground/20"> vs </span>
-              <span className="text-muted-foreground/30 tabular-nums">32.7% AI avg</span>
+              <span className="text-muted-foreground/30 tabular-nums">35% AI avg</span>
             </span>
           </div>
         </div>

@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { db, ensureDb } from "@/lib/db";
 import { agentState } from "@/lib/schema";
+import { DASHBOARD_DEMO_SEED_ENABLED, getDemoSubagentHealth } from "@/lib/demo-seed";
 import { desc, eq } from "drizzle-orm";
 
 const ALWAYS_ON_LABELS = ["scout", "pr-monitor", "pr-analyst"];
@@ -23,6 +24,10 @@ interface SlotData {
 export async function GET() {
   try {
     await ensureDb();
+
+    if (DASHBOARD_DEMO_SEED_ENABLED) {
+      return NextResponse.json(getDemoSubagentHealth());
+    }
 
     // Get latest agent_state row with currentSkill = "subagent-health"
     const rows = await db

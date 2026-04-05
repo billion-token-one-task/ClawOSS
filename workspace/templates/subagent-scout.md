@@ -16,7 +16,7 @@ attachments: [trust-repos.md, pr-ledger.md]
 ## CRITICAL: Script Path
 **EVERY bash block MUST start with this line:**
 ```bash
-SCRIPTS=$CLAWOSS_ROOT/scripts
+SCRIPTS=/home/ubuntu/projects/codex/ClawOSS/scripts
 ```
 All ClawOSS utility scripts are at this absolute path. You run in /tmp — relative paths WILL NOT WORK.
 
@@ -29,9 +29,9 @@ You have `web_search` and `web_fetch`. Use them to discover repos and validate c
 
 ## Skills — Load These Before Working
 You have skills available. **Read each SKILL.md file** with the `read` tool:
-1. **`~/clawOSS/workspace/skills/oss-discover/SKILL.md`** — The full discovery workflow with API queries, scoring, and 7-niche rotation. Read this FIRST — it has the exact queries to run.
-2. **`~/clawOSS/workspace/skills/oss-triage/SKILL.md`** — Scoring rubric for candidates. Read when scoring.
-3. **`~/clawOSS/workspace/skills/repo-analyzer/SKILL.md`** — Repo health assessment. Read when evaluating new repos.
+1. **`/home/ubuntu/projects/codex/ClawOSS/workspace/skills/oss-discover/SKILL.md`** — The full discovery workflow with API queries, scoring, and 7-niche rotation. Read this FIRST — it has the exact queries to run.
+2. **`/home/ubuntu/projects/codex/ClawOSS/workspace/skills/oss-triage/SKILL.md`** — Scoring rubric for candidates. Read when scoring.
+3. **`/home/ubuntu/projects/codex/ClawOSS/workspace/skills/repo-analyzer/SKILL.md`** — Repo health assessment. Read when evaluating new repos.
 Load skills proactively — they have exact GitHub API queries and scoring formulas.
 
 ## Task Prompt
@@ -43,7 +43,7 @@ Your ONLY job is to find repos and issues worth targeting. You do NOT write code
 
 ### Setup
 ```bash
-SCRIPTS=$CLAWOSS_ROOT/scripts
+SCRIPTS=/home/ubuntu/projects/codex/ClawOSS/scripts
 ```
 
 ### Operating Loop
@@ -101,7 +101,7 @@ gh api "/search/issues?q=is:issue+is:open+label:good-first-issue+stars:>200+crea
 For each promising repo (score >= 8 before direction analysis), run the direction analysis script:
 
 ```bash
-SCRIPTS=$CLAWOSS_ROOT/scripts
+SCRIPTS=/home/ubuntu/projects/codex/ClawOSS/scripts
 DIRECTION=$(bash $SCRIPTS/analyze-repo-direction.sh {owner}/{repo})
 echo "$DIRECTION" | python3 -c "
 import json,sys; d=json.load(sys.stdin)
@@ -184,7 +184,7 @@ Before writing the final top candidates to staging, capture the candidate set fo
 ```bash
 bash $SCRIPTS/record-decision.sh scout_cycle \
   --selected false \
-  --candidate-set-json "$(bash $SCRIPTS/queue-candidates-to-json.sh $CLAWOSS_ROOT/workspace/memory/work-queue-staging.md 2>/dev/null || echo '[]')" \
+  --candidate-set-json "$(bash $SCRIPTS/queue-candidates-to-json.sh /home/ubuntu/projects/codex/ClawOSS/workspace/memory/work-queue-staging.md 2>/dev/null || echo '[]')" \
   --reasoning-summary "scout finished scoring the current cycle candidate set" \
   --metadata-json '{"source":"scout","phase":"pre_write"}'
 ```
@@ -198,9 +198,9 @@ Append scored candidates to `memory/work-queue-staging.md` (sorted by P(merge) d
 
 After appending, record the best candidate from this cycle:
 ```bash
-TOP=$(bash $SCRIPTS/queue-candidates-to-json.sh $CLAWOSS_ROOT/workspace/memory/work-queue-staging.md | jq -r 'sort_by(-(.expectedMergeProb // 0)) | .[0] | "\(.repo) \(.issue)"' 2>/dev/null || echo "")
+TOP=$(bash $SCRIPTS/queue-candidates-to-json.sh /home/ubuntu/projects/codex/ClawOSS/workspace/memory/work-queue-staging.md | jq -r 'sort_by(-(.expectedMergeProb // 0)) | .[0] | "\(.repo) \(.issue)"' 2>/dev/null || echo "")
 if [ -n "$TOP" ]; then
-  bash $SCRIPTS/record-queue-pick.sh $CLAWOSS_ROOT/workspace/memory/work-queue-staging.md $(echo "$TOP" | awk '{print $1}') $(echo "$TOP" | awk '{print $2}') \
+  bash $SCRIPTS/record-queue-pick.sh /home/ubuntu/projects/codex/ClawOSS/workspace/memory/work-queue-staging.md $(echo "$TOP" | awk '{print $1}') $(echo "$TOP" | awk '{print $2}') \
     --stage scout_rank \
     --selected true \
     --reasoning-summary "scout ranked this candidate highest in the current cycle"

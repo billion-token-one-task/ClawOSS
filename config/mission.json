@@ -1,0 +1,196 @@
+{
+  "mission_id": "oss-contributor-v1",
+  "goal": "在活跃开源项目中持续贡献高质量小型 PR，最大化 merge rate，并优先建立少量信任仓库的持续贡献记录。",
+  "success_criteria": {
+    "primary": "目标任务对应的 PR 被 merge。",
+    "secondary": "PR 保持开放并收到积极维护者反馈。",
+    "failure": "PR 被 close without merge、任务被判定无效、或超过 mission 设定的等待上限。"
+  },
+  "constraints": {
+    "scope": "仅 public repo，仅 bug/docs/typo/test 类型贡献，不做 feature/refactor/enhancement。",
+    "safety": [
+      "禁止 push 到 main/master",
+      "禁止 force-push",
+      "禁止提交 secret/credential/.env",
+      "禁止修改 CI/CD pipeline"
+    ],
+    "resource_limits": {
+      "max_pr_size_lines": 200,
+      "max_concurrent_tasks": 1,
+      "max_followup_rounds": 3,
+      "followup_timeout_hours": 336
+    },
+    "forbidden_paths": [
+      ".env",
+      ".env.*",
+      ".github/workflows/",
+      "config/openclaw.json"
+    ],
+    "branch_prefixes": [
+      "clawoss/fix/",
+      "clawoss/docs/",
+      "clawoss/test/",
+      "clawoss/typo/"
+    ]
+  },
+  "work_units": {
+    "discover": {
+      "maps_to_state": "idle",
+      "goal_template": "Find a fresh batch of high-signal contribution candidates that fit the mission constraints.",
+      "output": {
+        "file": "workspace/memory/candidates.json",
+        "required_fields": ["candidates"]
+      }
+    },
+    "select": {
+      "maps_to_state": "idle",
+      "goal_template": "Select the single best candidate to work on now and write a task envelope with rationale and risks.",
+      "inputs": ["workspace/memory/candidates.json"],
+      "output": {
+        "file": "workspace/memory/task-envelope.json",
+        "required_fields": [
+          "task_id",
+          "task_type",
+          "repo",
+          "issue_number",
+          "issue_title",
+          "rationale",
+          "top_candidates",
+          "risk_flags"
+        ]
+      }
+    },
+    "implement": {
+      "maps_to_state": "task_selected",
+      "goal_template": "Implement the selected task with a minimal correct change, run fitting tests, and write the execution result contract.",
+      "inputs": ["workspace/memory/task-envelope.json"],
+      "output": {
+        "file": "workspace/memory/last-result.json",
+        "required_fields": [
+          "task_id",
+          "status",
+          "branch",
+          "repo_path",
+          "diff_summary",
+          "files_changed",
+          "tests_run",
+          "is_ready_to_submit",
+          "risks"
+        ]
+      }
+    },
+    "submit": {
+      "maps_to_state": "ready_for_submit",
+      "goal_template": "Submit the finished implementation as a PR and write the PR metadata contract.",
+      "inputs": ["workspace/memory/last-result.json"],
+      "output": {
+        "file": "workspace/memory/pr-info.json",
+        "required_fields": [
+          "task_id",
+          "pr_url",
+          "pr_number",
+          "pr_state",
+          "commit_sha"
+        ]
+      }
+    },
+    "followup": {
+      "maps_to_state": "awaiting_followup",
+      "goal_template": "Address reviewer feedback on the existing PR and record the follow-up outcome.",
+      "inputs": ["workspace/memory/pr-info.json"],
+      "output": {
+        "file": "workspace/memory/followup-result.json",
+        "required_fields": [
+          "task_id",
+          "action_taken",
+          "pr_state_after",
+          "needs_another_round"
+        ]
+      }
+    },
+    "reflect": {
+      "maps_to_state": "idle",
+      "trigger": {
+        "every_n_tasks": 5,
+        "consecutive_failures": 3
+      },
+      "goal_template": "Review recent outcomes, identify patterns, and write a reflection report with recommended changes.",
+      "inputs": [
+        "workspace/memory/pr-ledger.md",
+        "workspace/memory/failure-log.md",
+        "workspace/memory/trust-repos.md"
+      ],
+      "output": {
+        "file": "workspace/memory/reflection-result.json",
+        "required_fields": [
+          "insights",
+          "pattern_identified",
+          "strategy_changes",
+          "repos_to_deprioritize",
+          "repos_to_prioritize"
+        ]
+      }
+    }
+  },
+  "gates": {
+    "task_admission": {
+      "on_transition": "idle -> task_selected",
+      "requires_files": ["workspace/memory/task-envelope.json"],
+      "checks": [
+        "output_contract",
+        "task_type_scope",
+        "dedup_ledger",
+        "recent_failure_window",
+        "issue_open",
+        "repo_health"
+      ]
+    },
+    "pre_submit": {
+      "on_transition": "executing -> ready_for_submit",
+      "source": "git",
+      "requires_files": ["workspace/memory/last-result.json"],
+      "checks": [
+        "output_contract",
+        "diff_size",
+        "forbidden_paths",
+        "branch_name"
+      ]
+    },
+    "post_submit": {
+      "on_transition": "submitted -> pr_open",
+      "requires_files": ["workspace/memory/pr-info.json"],
+      "checks": [
+        "output_contract",
+        "pr_exists",
+        "pr_is_open",
+        "ledger_entry_present"
+      ]
+    },
+    "pr_resolution": {
+      "on_transition": "pr_open -> done",
+      "requires_files": ["workspace/memory/pr-info.json"],
+      "checks": ["pr_resolved"]
+    },
+    "followup_needed": {
+      "on_transition": "pr_open -> awaiting_followup",
+      "requires_files": ["workspace/memory/pr-info.json"],
+      "checks": ["followup_detected"]
+    }
+  },
+  "situation_snapshot": {
+    "sources": [
+      { "key": "trust_repos", "file": "workspace/memory/trust-repos.md", "strategy": "full" },
+      { "key": "pr_ledger", "file": "workspace/memory/pr-ledger.md", "strategy": "tail_10" },
+      { "key": "failure_log", "file": "workspace/memory/failure-log.md", "strategy": "recent_7d" },
+      { "key": "work_queue", "file": "workspace/memory/work-queue.md", "strategy": "tail_20" },
+      { "key": "locked_repos", "file": "workspace/memory/impl-spawn-state.md", "strategy": "full" }
+    ],
+    "max_chars": 12000
+  },
+  "session_strategy": {
+    "default_timeout_seconds": 900,
+    "max_turns_per_task": 5,
+    "reflect_on_every_n_tasks": 5,
+    "reflect_on_consecutive_failures": 3
+  }
+}

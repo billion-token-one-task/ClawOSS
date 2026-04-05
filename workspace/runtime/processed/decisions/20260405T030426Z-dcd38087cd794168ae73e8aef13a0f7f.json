@@ -1,0 +1,21 @@
+{
+  "timestamp": "2026-04-05T03:04:26Z",
+  "stage": "repo_health_gate",
+  "sessionId": null,
+  "strategyVersion": "bootstrap-v1",
+  "repo": "DioCrafts/OxiCloud",
+  "issueNumber": null,
+  "prNumber": null,
+  "selected": true,
+  "score": 23,
+  "confidence": null,
+  "expectedMergeProb": null,
+  "expectedTokenCost": null,
+  "reasoningSummary": "repo passed health gate",
+  "candidateSet": null,
+  "metadata": {
+    "threshold": 5,
+    "stars": 2874,
+    "review_rate": 100
+  }
+}

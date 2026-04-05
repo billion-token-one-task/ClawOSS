@@ -3,11 +3,22 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { db, ensureDb } from "@/lib/db";
 import { heartbeats, pullRequests, prReviews, metricsTokens, agentLogs, conversationMessages, subagentRuns } from "@/lib/schema";
+import {
+  addDemoSeedCounts,
+  DASHBOARD_DEMO_SEED_ENABLED,
+  DASHBOARD_DEMO_SEED,
+  getDemoAgentStatus,
+  getDemoCurrentTask,
+  getDemoRecentActivity,
+  getDemoRecentPRs,
+} from "@/lib/demo-seed";
+import { readRuntimeStatus } from "@/lib/runtime-status";
 import { desc, gte, sql, eq } from "drizzle-orm";
 
 export async function GET() {
   try {
     await ensureDb();
+    const runtime = await readRuntimeStatus();
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
@@ -49,13 +60,23 @@ export async function GET() {
     const mergedPRs = mergedPRsResult[0]?.count || 0;
     const openPRs = openPRsResult[0]?.count || 0;
     const closedPRs = closedPRsResult[0]?.count || 0;
-    const mergeRate = totalPRs > 0 ? Math.round((mergedPRs / totalPRs) * 1000) / 10 : 0;
-
     // PRs that have received at least one review
     const reviewedPRsResult = await db
       .select({ count: sql<number>`count(DISTINCT ${prReviews.prId})` })
       .from(prReviews);
     const reviewedPRs = reviewedPRsResult[0]?.count || 0;
+
+    const seededCounts = addDemoSeedCounts({
+      submitted: totalPRs,
+      reviewed: reviewedPRs,
+      merged: mergedPRs,
+      rejected: closedPRs,
+      open: openPRs,
+    });
+    const mergeRate =
+      seededCounts.submitted > 0
+        ? Math.round((seededCounts.merged / seededCounts.submitted) * 1000) / 10
+        : 0;
 
     // Follow-up sub-agent stats
     let followUpStats = { total: 0, active: 0, ledToMerge: 0 };
@@ -206,45 +227,92 @@ export async function GET() {
     const totalTokensAllTime = (totalTokensResult[0]?.input || 0) + (totalTokensResult[0]?.output || 0);
     const tokensPerMerge = mergedPRs > 0 ? Math.round(totalTokensAllTime / mergedPRs) : 0;
 
+    const demoAgentStatus = DASHBOARD_DEMO_SEED_ENABLED ? getDemoAgentStatus() : null;
+    const runtimeOnline = runtime?.overall === "running";
+    const runtimeTask = runtime?.note || null;
+    const agentStatus = DASHBOARD_DEMO_SEED_ENABLED && demoAgentStatus
+      ? {
+          ...demoAgentStatus,
+          isOnline: runtime ? runtimeOnline : demoAgentStatus.isOnline,
+          currentTask: runtimeTask || demoAgentStatus.currentTask,
+        }
+      : {
+          isOnline: runtime ? runtimeOnline : isOnline,
+          lastHeartbeat: hb?.timestamp || new Date(0),
+          currentTask: runtimeTask || hb?.currentTask || null,
+          uptimeSeconds: hb?.uptimeSeconds || 0,
+          heartbeatStreak: streak,
+        };
+
+    const resolvedCurrentTask = DASHBOARD_DEMO_SEED_ENABLED
+      ? {
+          ...getDemoCurrentTask(),
+          title: runtimeTask || getDemoCurrentTask().title,
+          status:
+            runtime?.overall === "running"
+              ? getDemoCurrentTask().status
+              : runtime?.overall === "degraded" || runtime?.overall === "restarting"
+                ? "blocked"
+                : "idle",
+        }
+      : currentTask;
+
+    const resolvedRecentActivity = DASHBOARD_DEMO_SEED_ENABLED
+      ? getDemoRecentActivity()
+      : recentActivity;
+
+    const resolvedRecentPRs = DASHBOARD_DEMO_SEED_ENABLED
+      ? getDemoRecentPRs()
+      : recentPRs;
+
     return NextResponse.json({
-      agentStatus: {
-        isOnline,
-        lastHeartbeat: hb?.timestamp || new Date(0),
-        currentTask: hb?.currentTask || null,
-        uptimeSeconds: hb?.uptimeSeconds || 0,
-        heartbeatStreak: streak,
-      },
+      agentStatus,
       stats: {
-        totalPRs,
-        mergedPRs,
-        openPRs,
-        closedPRs,
-        reviewedPRs,
+        totalPRs: seededCounts.submitted,
+        mergedPRs: seededCounts.merged,
+        openPRs: seededCounts.open,
+        closedPRs: seededCounts.rejected,
+        reviewedPRs: seededCounts.reviewed,
         mergeRate,
-        tokensUsedToday,
-        inputTokensToday,
-        outputTokensToday,
-        costToday,
+        tokensUsedToday: DASHBOARD_DEMO_SEED_ENABLED
+          ? DASHBOARD_DEMO_SEED.inputTokensToday + DASHBOARD_DEMO_SEED.outputTokensToday
+          : tokensUsedToday,
+        inputTokensToday: DASHBOARD_DEMO_SEED_ENABLED
+          ? DASHBOARD_DEMO_SEED.inputTokensToday
+          : inputTokensToday,
+        outputTokensToday: DASHBOARD_DEMO_SEED_ENABLED
+          ? DASHBOARD_DEMO_SEED.outputTokensToday
+          : outputTokensToday,
+        costToday: DASHBOARD_DEMO_SEED_ENABLED
+          ? DASHBOARD_DEMO_SEED.costToday
+          : costToday,
         totalCostAllTime,
-        costPerMerge,
-        tokensPerMerge,
-        avgHoursToReview,
+        costPerMerge: DASHBOARD_DEMO_SEED_ENABLED
+          ? DASHBOARD_DEMO_SEED.costPerMerge
+          : costPerMerge,
+        tokensPerMerge: DASHBOARD_DEMO_SEED_ENABLED
+          ? DASHBOARD_DEMO_SEED.tokensPerMerge
+          : tokensPerMerge,
+        avgHoursToReview: DASHBOARD_DEMO_SEED_ENABLED
+          ? DASHBOARD_DEMO_SEED.avgHoursToReview
+          : avgHoursToReview,
       },
       funnel: {
-        submitted: totalPRs,
-        reviewed: reviewedPRs,
-        merged: mergedPRs,
-        rejected: closedPRs,
-        open: openPRs,
+        submitted: seededCounts.submitted,
+        reviewed: seededCounts.reviewed,
+        merged: seededCounts.merged,
+        rejected: seededCounts.rejected,
+        open: seededCounts.open,
       },
       followUps: followUpStats,
-      recentActivity,
-      currentTask,
-      recentPRs,
+      recentActivity: resolvedRecentActivity,
+      currentTask: resolvedCurrentTask,
+      recentPRs: resolvedRecentPRs,
       dailyBudget: {
         dailyPRs,
         perRepo,
       },
+      runtime,
     });
   } catch (error) {
     return NextResponse.json(

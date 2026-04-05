@@ -26,10 +26,10 @@ Before pushing anything, ask one final time:
 ## De-Duplication Check (mandatory before `gh pr create` — NEVER SKIP)
 ```bash
 # ALWAYS use explicit username, not @me (which can fail in sub-agent contexts)
-# Check 1: open PRs by BillionClaw on this repo
-OPEN_COUNT=$(gh search prs --author BillionClaw --repo OWNER/REPO --state open --json number --jq 'length')
+# Check 1: open PRs by the configured GitHub account on this repo
+OPEN_COUNT=$(/usr/bin/gh search prs --author "${GITHUB_USERNAME}" --repo OWNER/REPO --state open --json number --jq 'length')
 # Check 2: search for PRs targeting the same issue (catches cross-fork dupes)
-ISSUE_PRS=$(gh search prs --author BillionClaw "Fixes #ISSUE_NUMBER repo:OWNER/REPO" --json number --jq 'length')
+ISSUE_PRS=$(/usr/bin/gh search prs --author "${GITHUB_USERNAME}" "Fixes #ISSUE_NUMBER repo:OWNER/REPO" --json number --jq 'length')
 ```
 If ANY result > 0: **ABANDON. Do NOT create duplicate PRs.**
 - No duplicate PRs for the same issue even across different branches
@@ -47,7 +47,7 @@ This prevents the 5x-duplicate-on-instructor and 3x-duplicate-on-taskcoach incid
 2. Alpha human gate (mandatory before `gh pr create`):
    ```bash
    DIFF_LINES=$(git diff --shortstat HEAD~1..HEAD 2>/dev/null | awk '{add+=$4; del+=$6} END {print add+del+0}')
-   bash "$CLAWOSS_ROOT/scripts/evaluate-alpha-gate.sh" pr_submit \
+   bash "/home/ubuntu/projects/codex/ClawOSS/scripts/evaluate-alpha-gate.sh" pr_submit \
      --repo OWNER/REPO \
      --pr-type {bugfix|docs|typo|test} \
      --diff-lines "${DIFF_LINES:-0}" \
@@ -55,7 +55,7 @@ This prevents the 5x-duplicate-on-instructor and 3x-duplicate-on-taskcoach incid
      --record
    ```
    If decision is `review`, STOP and leave the PR in local branch state for human approval.
-3. **Verify target branch:** `gh api repos/{owner}/{repo} --jq '.default_branch'` — create PR against THIS branch, not hardcoded 'main' or 'master'. Wrong target = instant close.
+3. **Verify target branch:** `/usr/bin/gh api repos/{owner}/{repo} --jq '.default_branch'` — create PR against THIS branch, not hardcoded 'main' or 'master'. Wrong target = instant close.
 4. **PR template check:** `ls .github/PULL_REQUEST_TEMPLATE.md .github/PULL_REQUEST_TEMPLATE/ 2>/dev/null` — if a template exists, use its structure (fill in sections, check checkboxes). If not, use our format below.
 5. Create PR using `gh pr create --base $DEFAULT_BRANCH`:
    - Title: `{type}(scope): description` following Conventional Commits — type must match contribution

@@ -1,6 +1,6 @@
 ---
 name: repo-analyzer
-description: "Analyze repo health and conventions BEFORE queuing any issue. MANDATORY health gate: stars >=200, last commit <2wk, merge time <14d, review rate >50%, open PRs <50. Use $CLAWOSS_ROOT/scripts/repo-health-check.sh for automation."
+description: "Analyze repo health and conventions BEFORE queuing any issue. MANDATORY health gate: stars >=200, last commit <2wk, merge time <14d, review rate >50%, open PRs <50. Use /home/ubuntu/projects/codex/ClawOSS/scripts/repo-health-check.sh for automation."
 user-invocable: true
 ---
 
@@ -12,7 +12,7 @@ The repo health gate is MANDATORY — run it BEFORE any other analysis.
 ## Quick Check (use the script)
 For fast automated health checks, run:
 ```bash
-$CLAWOSS_ROOT/scripts/repo-health-check.sh {owner}/{repo}
+/home/ubuntu/projects/codex/ClawOSS/scripts/repo-health-check.sh {owner}/{repo}
 ```
 Exit 0 = healthy, exit 1 = skip. Outputs JSON with metrics and composite score.
 

@@ -7,9 +7,10 @@ REPO="${1:?Usage: check-already-fixed.sh <owner/repo> <issue_number>}"
 ISSUE="${2:?Usage: check-already-fixed.sh <owner/repo> <issue_number>}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 RECORD_DECISIONS="${CLAWOSS_RECORD_DECISIONS:-0}"
+. "$SCRIPT_DIR/lib/github-rate-limit.sh"
 
 # 1. Is the issue closed?
-ISSUE_STATE=$(gh api "repos/${REPO}/issues/${ISSUE}" --jq '.state' 2>/dev/null)
+ISSUE_STATE=$(gh_cached_api 900 "repos/${REPO}/issues/${ISSUE}" --jq '.state' 2>/dev/null)
 if [ -z "$ISSUE_STATE" ]; then
   echo "{\"fixed\": false, \"repo\": \"$REPO\", \"issue\": $ISSUE, \"error\": \"api_failed\"}"
   exit 0
@@ -28,7 +29,7 @@ if [ "$ISSUE_STATE" = "closed" ]; then
 fi
 
 # 2. Recently merged PRs referencing this issue
-MERGED_REFS=$(gh search prs --repo "$REPO" "is:merged" --limit 15 --json title,body,number --jq "[.[] | select((.title // \"\") + (.body // \"\") | test(\"#${ISSUE}\"; \"i\"))] | length" 2>/dev/null || true)
+MERGED_REFS=$(gh_cached_search_prs 1800 --repo "$REPO" "is:merged" --limit 15 --json title,body,number --jq "[.[] | select((.title // \"\") + (.body // \"\") | test(\"#${ISSUE}\"; \"i\"))] | length" 2>/dev/null || true)
 MERGED_REFS=${MERGED_REFS:-0}
 if [ "$MERGED_REFS" -gt 0 ]; then
   if [ "$RECORD_DECISIONS" = "1" ]; then
@@ -44,7 +45,7 @@ if [ "$MERGED_REFS" -gt 0 ]; then
 fi
 
 # 3. Recent commits with fix keywords
-RECENT_FIX=$(gh api "repos/${REPO}/commits?per_page=20" --jq "[.[] | select(.commit.message | test(\"fix.*#${ISSUE}|close.*#${ISSUE}|resolve.*#${ISSUE}\"; \"i\"))] | length" 2>/dev/null || true)
+RECENT_FIX=$(gh_cached_api 1800 "repos/${REPO}/commits?per_page=20" --jq "[.[] | select(.commit.message | test(\"fix.*#${ISSUE}|close.*#${ISSUE}|resolve.*#${ISSUE}\"; \"i\"))] | length" 2>/dev/null || true)
 RECENT_FIX=${RECENT_FIX:-0}
 if [ "$RECENT_FIX" -gt 0 ]; then
   if [ "$RECORD_DECISIONS" = "1" ]; then

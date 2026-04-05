@@ -5,11 +5,20 @@ echo "=== Starting ClawOSS ==="
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/lib/path-helpers.sh"
+. "$SCRIPT_DIR/lib/github-auth-check.sh"
 
 PROJECT_DIR="$(clawoss_resolve_project_dir "$0")"
 AGENT_ID="clawoss"
 WORKSPACE_DIR="$(clawoss_resolve_workspace_dir "$0")"
-AGENT_MODEL="${CLAWOSS_MODEL:-${CLAWOSS_DEFAULT_MODEL:-minimax/MiniMax-M2.7}}"
+AGENT_MODEL="${CLAWOSS_MODEL:-${CLAWOSS_AGENT_MODEL:-${CLAWOSS_PRIMARY_MODEL:-${CLAWOSS_DEFAULT_MODEL:-minimax/MiniMax-M2.7}}}}"
+
+if [ -f "$PROJECT_DIR/.env" ]; then
+    set -a
+    # shellcheck disable=SC1090
+    source "$PROJECT_DIR/.env"
+    set +a
+fi
+clawoss_require_matching_github_token
 
 # Verify setup
 if [ ! -L "$HOME/.openclaw/workspace" ]; then

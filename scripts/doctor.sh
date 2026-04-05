@@ -67,7 +67,7 @@ JQ_READY=$(check_cmd jq)
 PYTHON_READY=$(check_cmd python3)
 ALPHA_GATE_CONFIG_READY=$([ -f "$PROJECT_DIR/config/alpha-gates.json" ] && echo true || echo false)
 
-if [ -n "${MINIMAX_API_KEY:-}" ] || [ -n "${KIMI_API_KEY:-}" ]; then
+if [ -n "${OPENAI_API_KEY:-}" ] || [ -n "${OPENROUTER_API_KEY:-}" ] || [ -n "${DEEPSEEK_API_KEY:-}" ] || [ -n "${MINIMAX_API_KEY:-}" ] || [ -n "${KIMI_API_KEY:-}" ] || [ -n "${CUSTOM_OPENAI_API_KEY:-}" ]; then
   MODEL_AUTH_READY=true
 else
   MODEL_AUTH_READY=false

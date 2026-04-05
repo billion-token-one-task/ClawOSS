@@ -23,7 +23,7 @@ The orchestrator calls this skill to:
 ## Step 1: Scan Open PRs
 
 ```bash
-gh search prs --author BillionClaw --state open --limit 50 --json repository,number,title,url,updatedAt
+gh search prs --author "${GITHUB_USERNAME}" --state open --limit 50 --json repository,number,title,url,updatedAt
 ```
 
 If no open PRs: skip to next HEARTBEAT step. Nothing to follow up on.

@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { db, ensureDb } from "@/lib/db";
 import { pullRequests, prReviews, autonomySnapshots, agentState } from "@/lib/schema";
+import { DASHBOARD_DEMO_SEED_ENABLED, getDemoAlerts } from "@/lib/demo-seed";
 import { eq, sql, desc, gte, and } from "drizzle-orm";
 
 interface Alert {
@@ -25,6 +26,9 @@ interface Alert {
 export async function GET() {
   try {
     await ensureDb();
+    if (DASHBOARD_DEMO_SEED_ENABLED) {
+      return NextResponse.json(getDemoAlerts());
+    }
     const alerts: Alert[] = [];
     const now = new Date();
 

@@ -59,7 +59,7 @@ export function PRPortfolioHealth() {
       dot: "bg-amber-500",
     },
     critical: {
-      label: "CRITICAL",
+      label: "NEEDS WORK",
       color: "text-red-400 border-red-500/25 bg-red-500/8",
       dot: "bg-red-500",
     },

@@ -3,11 +3,15 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { db, ensureDb } from "@/lib/db";
 import { pullRequests, subagentRuns, heartbeats } from "@/lib/schema";
+import { DASHBOARD_DEMO_SEED_ENABLED, getDemoThroughput } from "@/lib/demo-seed";
 import { desc, gte, eq, sql, and } from "drizzle-orm";
 
 export async function GET() {
   try {
     await ensureDb();
+    if (DASHBOARD_DEMO_SEED_ENABLED) {
+      return NextResponse.json(getDemoThroughput());
+    }
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const threeHoursAgo = new Date(now.getTime() - 3 * 60 * 60 * 1000);

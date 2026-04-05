@@ -56,6 +56,17 @@ run_test() {
 echo "=== ClawOSS Script Test Suite ==="
 echo ""
 
+echo "mission config:"
+run_test "mission.json matches required contract" "bash $SCRIPTS_DIR/tests/test-mission-config.sh" 0
+echo "verify result:"
+run_test "gate verification is deterministic" "bash $SCRIPTS_DIR/tests/test-verify-result.sh" 0
+echo "build prompt:"
+run_test "prompt builder scopes context correctly" "bash $SCRIPTS_DIR/tests/test-build-prompt.sh" 0
+echo "run cycle:"
+run_test "main loop state machine and recovery are deterministic" "bash $SCRIPTS_DIR/tests/test-run-cycle.sh" 0
+echo "refactor surface:"
+run_test "static architecture files match the refactor spec" "bash $SCRIPTS_DIR/tests/test-refactor-surface.sh" 0
+
 # ── check-blocklist.sh ──
 echo "check-blocklist.sh:"
 run_test "no args = usage error" "bash $SCRIPTS_DIR/check-blocklist.sh 2>&1" 1
@@ -91,6 +102,8 @@ run_test "no args = usage error" "bash $SCRIPTS_DIR/unlock-repo.sh 2>&1" 1
 # ── init-workspace-state.sh ──
 echo "init-workspace-state.sh:"
 run_test "idempotent workspace bootstrap" "PROJECT_DIR=$TEST_PROJECT bash $SCRIPTS_DIR/init-workspace-state.sh" 0 true
+run_test "creates lifecycle-state.json" "test -f $TEST_PROJECT/workspace/memory/lifecycle-state.json" 0
+run_test "creates failure-log.md" "test -f $TEST_PROJECT/workspace/memory/failure-log.md" 0
 
 # ── spool-json-event.sh ──
 echo "spool-json-event.sh:"

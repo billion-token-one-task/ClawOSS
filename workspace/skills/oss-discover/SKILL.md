@@ -27,7 +27,7 @@ Issues older than 1 month are SKIPPED entirely.
 ## Pre-Checks (before ANY query)
 1. Read `memory/pr-ledger.md` — SKIP issues already attempted, superseded, or assigned.
 2. For each candidate issue, quick-check supersession before scoring:
-   - `gh api "repos/{owner}/{repo}/issues/{number}" --jq '{assignees: (.assignees | length), linked_prs: 0}'`
+   - `/usr/bin/gh api "repos/{owner}/{repo}/issues/{number}" --jq '{assignees: (.assignees | length), linked_prs: 0}'`
    - If issue has assignees > 0, SKIP (assigned to someone else).
    - Check issue timeline for linked PRs: if open PRs exist, SKIP (already being worked on).
    - Mark skipped issues as `superseded` or `assigned` in pr-ledger.md.
@@ -44,7 +44,7 @@ Trusted repos get **+8 bonus** in scoring. This is the single biggest lever for 
 1. **FIRST**: Search trusted repos (memory/trust-repos.md) for fresh issues — these are highest priority.
 2. Run Priority Queries (Tier 0 first, then 1, then 2) for new repo discovery.
 3. Filter: stars >= 200, not in pr-ledger, created within time window
-4. **Repo health pre-filter** (BEFORE scoring): quick-check via `$CLAWOSS_ROOT/scripts/repo-health-check.sh` or `gh api`. SKIP repos that fail.
+4. **Repo health pre-filter** (BEFORE scoring): quick-check via `/home/ubuntu/projects/codex/ClawOSS/scripts/repo-health-check.sh` or `gh api`. SKIP repos that fail.
 5. Score: merge probability (most important), recency, fix feasibility, repo health. Minimum score 5. **+8 trusted repo bonus.**
 6. Return ranked top 10. Write full list to memory/today.md.
 
@@ -87,7 +87,7 @@ Search GitHub using topic tags and description keywords — rotate through niche
 
 ### Known High-Value Repos (supplement, not replace, criteria search)
 These are verified high-star, actively-maintained repos in our niche. The agent should discover more autonomously.
-Always run `$CLAWOSS_ROOT/scripts/repo-health-check.sh` before targeting — this list is not a bypass.
+Always run `/home/ubuntu/projects/codex/ClawOSS/scripts/repo-health-check.sh` before targeting — this list is not a bypass.
 
 **Agent Frameworks & Orchestration (highest value):**
 langchain-ai/langchain *(requires issue assignment — comment first)*, langchain-ai/langgraph, crewAIInc/crewAI, stanfordnlp/dspy,
@@ -119,7 +119,7 @@ khoj-ai/khoj, OpenHands/OpenHands
 ## Priority Queries
 
 **IMPORTANT: `gh search issues` with qualifier combos (stars:>, topic:, label:) returns EMPTY.
-Use `gh api` with the search endpoint instead:**
+Use `/usr/bin/gh api` with the search endpoint instead:**
 ```bash
 # CORRECT (works):
 gh api "/search/issues?q=is:open+label:bug+stars:>200+language:python&sort=created&order=desc&per_page=30" --jq '.items[] | {number, title, html_url, created_at, repository_url}'
@@ -224,7 +224,7 @@ For each candidate repo, do a quick check using `gh api repos/{owner}/{repo}`:
 6. **Anti-bot check** — if you've seen "no bot PRs" or "no AI" in CONTRIBUTING.md from a previous visit, skip
 7. **CLA repos**: Note CLA requirement but don't attempt signing — CLAs require manual signing by the account owner
 
-You CAN use `$CLAWOSS_ROOT/scripts/repo-health-check.sh` for a thorough check, but it's NOT required for every repo. Use your judgment — a quick `gh api` call is often enough.
+You CAN use `/home/ubuntu/projects/codex/ClawOSS/scripts/repo-health-check.sh` for a thorough check, but it's NOT required for every repo. Use your judgment — a quick `gh api` call is often enough.
 
 If a repo fails, skip all issues from it. Cache the result in `memory/repos/`.
 

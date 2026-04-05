@@ -1,0 +1,20 @@
+{
+  "timestamp": "2026-04-03T23:40:00Z",
+  "stage": "repo_health_gate",
+  "sessionId": null,
+  "strategyVersion": "bootstrap-v1",
+  "repo": "pallets/jinja",
+  "issueNumber": null,
+  "prNumber": null,
+  "selected": false,
+  "score": 3,
+  "confidence": null,
+  "expectedMergeProb": null,
+  "expectedTokenCost": null,
+  "reasoningSummary": "last push 2025-06-14T20:35:04Z older than 2 weeks",
+  "candidateSet": null,
+  "metadata": {
+    "failure_category": "repo_health_fail: no activity in 2+ weeks",
+    "threshold": 5
+  }
+}

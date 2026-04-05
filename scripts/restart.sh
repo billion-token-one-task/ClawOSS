@@ -12,10 +12,16 @@ echo ""
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/lib/path-helpers.sh"
+. "$SCRIPT_DIR/lib/github-auth-check.sh"
+. "$SCRIPT_DIR/lib/runtime-status.sh"
 
 PROJECT_DIR="$(clawoss_resolve_project_dir "$0")"
 WORKSPACE_DIR="$(clawoss_resolve_workspace_dir "$0")"
-CLAWOSS_DEFAULT_MODEL="${CLAWOSS_DEFAULT_MODEL:-minimax/MiniMax-M2.7}"
+CLAWOSS_PRIMARY_MODEL="${CLAWOSS_PRIMARY_MODEL:-${CLAWOSS_DEFAULT_MODEL:-minimax/MiniMax-M2.7}}"
+CLAWOSS_FALLBACK_MODEL="${CLAWOSS_FALLBACK_MODEL:-}"
+CLAWOSS_SUBAGENT_MODEL="${CLAWOSS_SUBAGENT_MODEL:-$CLAWOSS_PRIMARY_MODEL}"
+CLAWOSS_HEARTBEAT_MODEL="${CLAWOSS_HEARTBEAT_MODEL:-$CLAWOSS_PRIMARY_MODEL}"
+CLAWOSS_AGENT_MODEL="${CLAWOSS_AGENT_MODEL:-$CLAWOSS_PRIMARY_MODEL}"
 DEPLOYED_CONFIG="$HOME/.openclaw/openclaw.json"
 GATEWAY_PLIST="$HOME/Library/LaunchAgents/ai.openclaw.gateway.plist"
 SMOKE_MODE=0
@@ -29,6 +35,20 @@ smoke_sleep() {
         return 0
     fi
     sleep "$1"
+}
+
+runtime_status() {
+    clawoss_write_runtime_status \
+        "$WORKSPACE_DIR" \
+        "$1" \
+        "$2" \
+        "$3" \
+        "$4" \
+        "$5" \
+        "$6" \
+        "$7" \
+        "$8" \
+        "restart.sh"
 }
 
 # ── 0. Preflight checks ──────────────────────────────────────────────
@@ -70,10 +90,15 @@ if [ -f "$PROJECT_DIR/.env" ]; then
 else
     echo "[INFO] No .env found — using existing env vars"
 fi
+clawoss_require_matching_github_token || exit 1
+runtime_status "restarting" "unknown" "stopped" "stopped" "false" "true" "unknown" "Restart in progress"
 
 # ── 2. Git identity ──────────────────────────────────────────────────
-GITHUB_USERNAME="${GITHUB_USERNAME:-BillionClaw}"
-GITHUB_EMAIL="${GITHUB_EMAIL:-267901332+BillionClaw@users.noreply.github.com}"
+if [ -z "${GITHUB_USERNAME:-}" ] && [ -n "${GITHUB_TOKEN:-}" ]; then
+    GITHUB_USERNAME="$(GH_TOKEN="$GITHUB_TOKEN" gh api user --jq .login 2>/dev/null || true)"
+fi
+GITHUB_USERNAME="${GITHUB_USERNAME:-clawoss-bot}"
+GITHUB_EMAIL="${GITHUB_EMAIL:-${GITHUB_USERNAME}@users.noreply.github.com}"
 git config --global user.name "$GITHUB_USERNAME"
 git config --global user.email "$GITHUB_EMAIL"
 echo "[OK] Git identity: $GITHUB_USERNAME <$GITHUB_EMAIL>"
@@ -117,14 +142,19 @@ REPO_CONFIG_RESOLVED=$(sed \
 
 _REPO_CONFIG="$REPO_CONFIG_RESOLVED" \
 _DEPLOYED="$DEPLOYED_CONFIG" \
-_KIMI_KEY="${KIMI_API_KEY:-}" \
+_OPENAI_KEY="${OPENAI_API_KEY:-}" \
+_OPENROUTER_KEY="${OPENROUTER_API_KEY:-}" \
+_DEEPSEEK_KEY="${DEEPSEEK_API_KEY:-}" \
 _MINIMAX_KEY="${MINIMAX_API_KEY:-}" \
+_KIMI_KEY="${KIMI_API_KEY:-}" \
+_CUSTOM_OPENAI_KEY="${CUSTOM_OPENAI_API_KEY:-}" \
+_CUSTOM_OPENAI_BASE_URL="${CUSTOM_OPENAI_BASE_URL:-}" \
 _GH_TOKEN="${GITHUB_TOKEN:-}" \
+_GH_USER="${GITHUB_USERNAME:-}" \
+_GH_EMAIL="${GITHUB_EMAIL:-}" \
 _DASH_URL="${DASHBOARD_URL:-https://clawoss-dashboard.vercel.app}" \
 _CLAW_KEY="${CLAW_API_KEY:-}" \
-_OPENROUTER_KEY="${OPENROUTER_API_KEY:-}" \
 _CLAWOSS_ROOT="${PROJECT_DIR}" \
-_CLAWOSS_MODEL="${CLAWOSS_DEFAULT_MODEL}" \
 _RECORD_DECISIONS="${CLAWOSS_RECORD_DECISIONS:-1}" \
 _RECORD_OUTCOMES="${CLAWOSS_RECORD_OUTCOMES:-1}" \
 python3 -c "
@@ -153,14 +183,19 @@ merged = deep_merge(deployed, repo_config)
 # Inject env vars (non-empty only)
 merged.setdefault('env', {})
 env_map = {
-    'KIMI_API_KEY': os.environ.get('_KIMI_KEY', ''),
+    'OPENAI_API_KEY': os.environ.get('_OPENAI_KEY', ''),
+    'OPENROUTER_API_KEY': os.environ.get('_OPENROUTER_KEY', ''),
+    'DEEPSEEK_API_KEY': os.environ.get('_DEEPSEEK_KEY', ''),
     'MINIMAX_API_KEY': os.environ.get('_MINIMAX_KEY', ''),
+    'KIMI_API_KEY': os.environ.get('_KIMI_KEY', ''),
+    'CUSTOM_OPENAI_API_KEY': os.environ.get('_CUSTOM_OPENAI_KEY', ''),
+    'CUSTOM_OPENAI_BASE_URL': os.environ.get('_CUSTOM_OPENAI_BASE_URL', ''),
     'GITHUB_TOKEN': os.environ.get('_GH_TOKEN', ''),
+    'GITHUB_USERNAME': os.environ.get('_GH_USER', ''),
+    'GITHUB_EMAIL': os.environ.get('_GH_EMAIL', ''),
     'DASHBOARD_URL': os.environ.get('_DASH_URL', ''),
     'CLAW_API_KEY': os.environ.get('_CLAW_KEY', ''),
-    'OPENROUTER_API_KEY': os.environ.get('_OPENROUTER_KEY', ''),
     'CLAWOSS_ROOT': os.environ.get('_CLAWOSS_ROOT', ''),
-    'CLAWOSS_DEFAULT_MODEL': os.environ.get('_CLAWOSS_MODEL', ''),
     'CLAWOSS_RECORD_DECISIONS': os.environ.get('_RECORD_DECISIONS', ''),
     'CLAWOSS_RECORD_OUTCOMES': os.environ.get('_RECORD_OUTCOMES', ''),
 }
@@ -173,6 +208,13 @@ with open(deployed_path, 'w') as f:
     json.dump(merged, f, indent=2)
     f.write('\n')
 "
+
+CLAWOSS_PRIMARY_MODEL="$CLAWOSS_PRIMARY_MODEL" \
+CLAWOSS_FALLBACK_MODEL="$CLAWOSS_FALLBACK_MODEL" \
+CLAWOSS_SUBAGENT_MODEL="$CLAWOSS_SUBAGENT_MODEL" \
+CLAWOSS_HEARTBEAT_MODEL="$CLAWOSS_HEARTBEAT_MODEL" \
+CLAWOSS_AGENT_MODEL="$CLAWOSS_AGENT_MODEL" \
+python3 "$SCRIPT_DIR/lib/configure-openclaw-models.py" "$DEPLOYED_CONFIG"
 
 if [ $? -eq 0 ]; then
     echo "[OK] Config deployed (deep-merged with env vars)"
@@ -293,7 +335,7 @@ FOLLOWEOF
 echo "[OK] Spawn state reset to empty (0 active implementations)"
 
 # ── 7c. Clean stale subagent result files ─────────────────────────
-RESULT_COUNT=$(ls "$WORKSPACE_DIR/memory/subagent-result-"*.md 2>/dev/null | wc -l | tr -d ' ')
+RESULT_COUNT=$(find "$WORKSPACE_DIR/memory" -maxdepth 1 -name 'subagent-result-*.md' -type f 2>/dev/null | wc -l | tr -d ' ')
 rm -f "$WORKSPACE_DIR/memory/subagent-result-"*.md 2>/dev/null || true
 echo "[OK] Cleaned $RESULT_COUNT stale result files"
 
@@ -347,15 +389,30 @@ fi
 openclaw gateway stop 2>/dev/null || true
 smoke_sleep 2
 echo "[OK] Gateway stopped"
+runtime_status "restarting" "stopped" "stopped" "stopped" "false" "true" "unknown" "Gateway stopped, starting managed service"
 
-# ── 13. Start gateway (prefer install for launchd, fallback to run) ───
-# `gateway install` creates/updates the launchd plist and loads it.
-# The plist has all env vars baked in (KIMI_API_KEY, GITHUB_TOKEN, etc.)
-# `gateway run &` is a fallback that inherits the current shell env.
-if openclaw gateway install 2>/dev/null; then
-    echo "[OK] Gateway installed via launchd"
+# ── 13. Start gateway (prefer managed service, fallback to run) ───────
+# `gateway install` creates/updates the service definition, but on Linux it
+# does not always start the systemd user unit immediately. Start it explicitly
+# before falling back to an unmanaged background process.
+GATEWAY_STARTED=0
+if openclaw gateway install --force 2>/dev/null; then
+    if command -v systemctl >/dev/null 2>&1; then
+        if systemctl --user start openclaw-gateway.service 2>/dev/null; then
+            echo "[OK] Gateway installed and started via systemd"
+            GATEWAY_STARTED=1
+        else
+            echo "[WARN] gateway install succeeded but systemd start failed"
+        fi
+    else
+        echo "[OK] Gateway installed via managed service"
+    fi
 else
-    echo "[WARN] gateway install failed — falling back to gateway run"
+    echo "[WARN] gateway install failed"
+fi
+
+if [ "$GATEWAY_STARTED" -eq 0 ] && ! openclaw gateway status 2>/dev/null | grep -qi "running\|reachable\|ok"; then
+    echo "[WARN] falling back to unmanaged gateway run"
     openclaw gateway run &
     echo "[OK] Gateway started in background (PID $!)"
 fi
@@ -365,11 +422,13 @@ smoke_sleep 8  # 8s to allow gateway to fully initialize heartbeat timer + sessi
 # Verify gateway is running
 if openclaw gateway status 2>/dev/null | grep -qi "running\|reachable\|ok"; then
     echo "[OK] Gateway verified running"
+    runtime_status "degraded" "running" "stopped" "stopped" "true" "true" "unknown" "Gateway running, finishing restart"
 else
     echo "[FAIL] Gateway not running after startup"
     echo "       Try: openclaw gateway status"
     echo "       Try: openclaw gateway run"
     echo "       Logs: cat ~/.openclaw/logs/gateway.err.log"
+    runtime_status "error" "stopped" "stopped" "stopped" "false" "true" "fail" "Gateway failed to start"
     exit 1
 fi
 
@@ -384,14 +443,62 @@ smoke_sleep 1
 if [ -f "$PROJECT_DIR/scripts/dashboard-sync.sh" ]; then
     if [ "$SMOKE_MODE" -eq 1 ]; then
         echo "[INFO] Smoke mode: skipping dashboard-sync startup"
+        DASHBOARD_SYNC_STATE="stopped"
     elif [ -z "${CLAW_API_KEY:-}" ]; then
         echo "[WARN] CLAW_API_KEY not set — dashboard-sync will not start"
+        DASHBOARD_SYNC_STATE="stopped"
     else
         nohup bash "$PROJECT_DIR/scripts/dashboard-sync.sh" > /tmp/dashboard-sync.log 2>&1 &
         echo "[OK] Dashboard sync started (PID $!)"
+        DASHBOARD_SYNC_STATE="running"
     fi
 else
     echo "[INFO] No dashboard-sync.sh found — skipping"
+    DASHBOARD_SYNC_STATE="unknown"
+fi
+
+# ── 14b. Run-cycle controller ─────────────────────────────────────────
+if [ "$SMOKE_MODE" -eq 1 ]; then
+    echo "[INFO] Smoke mode: skipping run-cycle controller startup"
+    RUN_CYCLE_STATE="stopped"
+else
+    if command -v systemctl >/dev/null 2>&1; then
+        RUN_CYCLE_SERVICE_DIR="$HOME/.config/systemd/user"
+        RUN_CYCLE_SERVICE="$RUN_CYCLE_SERVICE_DIR/clawoss-run-cycle.service"
+        mkdir -p "$RUN_CYCLE_SERVICE_DIR"
+        cat > "$RUN_CYCLE_SERVICE" <<EOF
+[Unit]
+Description=ClawOSS Run Cycle Controller
+After=network-online.target openclaw-gateway.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=$PROJECT_DIR
+ExecStart=/bin/bash $PROJECT_DIR/scripts/run-cycle.sh
+Restart=always
+RestartSec=5
+Environment=HOME=$HOME
+Environment=PATH=$PATH
+
+[Install]
+WantedBy=default.target
+EOF
+        systemctl --user daemon-reload >/dev/null 2>&1 || true
+        systemctl --user enable --now clawoss-run-cycle.service >/dev/null 2>&1 || true
+        if systemctl --user is-active --quiet clawoss-run-cycle.service; then
+            echo "[OK] Run-cycle controller started via systemd"
+            RUN_CYCLE_STATE="running"
+        else
+            echo "[WARN] Run-cycle systemd service did not stay active"
+            RUN_CYCLE_STATE="stopped"
+        fi
+    else
+        pkill -f "scripts/run-cycle.sh" 2>/dev/null || true
+        nohup bash "$PROJECT_DIR/scripts/run-cycle.sh" > /tmp/clawoss-run-cycle.log 2>&1 &
+        echo "[OK] Run-cycle controller started (PID $!)"
+        RUN_CYCLE_STATE="running"
+    fi
 fi
 
 # ── 15. PR ledger sync (launchd, runs every 60s) ─────────────────────
@@ -429,16 +536,12 @@ else
     echo "[OK] Dual push remotes already configured"
 fi
 
-# ── 16. Kick the agent ───────────────────────────────────────────────
+# ── 16. Run-cycle owns work dispatch ─────────────────────────────────
 smoke_sleep 3
 if [ "$SMOKE_MODE" -eq 1 ]; then
-    echo "[INFO] Smoke mode: skipping agent wake event"
-elif openclaw system event \
-    --text "ClawOSS V10.1 restart. Execute HEARTBEAT.md steps 0-7. Always-on agents use runTimeoutSeconds:0 (no timeout). Discover across ALL niches. Fill all 10 impl slots. NEVER idle — always work on something." \
-    --mode now 2>&1; then
-    echo "[OK] Agent kicked (V10)"
+    echo "[INFO] Smoke mode: skipping run-cycle warmup"
 else
-    echo "[WARN] Agent wake event failed — agent will wake on next heartbeat timer"
+    echo "[OK] Run-cycle controller will dispatch concrete work units"
 fi
 
 # ── 17. Start tmp-cleaner daemon ───────────────────────────────────────
@@ -464,6 +567,7 @@ elif [ -n "$DASH_KEY" ]; then
 else
     echo "[WARN] CLAW_API_KEY not set — skipping dashboard sync"
 fi
+runtime_status "running" "running" "${DASHBOARD_SYNC_STATE:-unknown}" "${RUN_CYCLE_STATE:-unknown}" "true" "true" "pass" "ClawOSS runtime active"
 
 # ── Summary ───────────────────────────────────────────────────────────
 echo ""

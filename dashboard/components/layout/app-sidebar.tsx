@@ -44,7 +44,7 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader className="border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-bold tracking-[-0.03em] ascii-gradient" style={{ fontFamily: "var(--font-space-grotesk)" }}>ClawOSS</span>
+          <span className="text-sm font-bold tracking-[-0.03em] ascii-gradient" style={{ fontFamily: "var(--font-space-grotesk)" }}>BillionClaw</span>
           <Badge variant="outline" className="text-[8px] h-3.5 px-1 text-muted-foreground/30 border-muted-foreground/10 font-mono">
             v7
           </Badge>
@@ -87,7 +87,7 @@ export function AppSidebar() {
             </p>
           </div>
           <p className="text-[8px] text-muted-foreground/15 font-mono">
-            autonomous oss contributor
+            showcase pull request portfolio
           </p>
         </div>
       </SidebarFooter>

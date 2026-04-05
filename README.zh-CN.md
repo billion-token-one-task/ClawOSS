@@ -40,8 +40,14 @@ npm run alpha:upgrade
 最少需要配置的环境变量：
 
 - `GITHUB_TOKEN`
-- `MINIMAX_API_KEY`
+- 至少一个与你在 `.env` 中所选模型对应的 provider key：
+  `OPENAI_API_KEY`、`OPENROUTER_API_KEY`、`DEEPSEEK_API_KEY`、`MINIMAX_API_KEY`、`KIMI_API_KEY` 或 `CUSTOM_OPENAI_API_KEY`
 - `CLAW_API_KEY`
+
+模型选择现在走 `.env`：
+设置 `CLAWOSS_PRIMARY_MODEL`，并按需设置 `CLAWOSS_FALLBACK_MODEL` /
+`CLAWOSS_SUBAGENT_MODEL`，格式为 `provider/model`，例如
+`openai/gpt-4.1` 或 `openrouter/openai/gpt-4.1-mini`。
 
 ## 相对上一版的变化
 

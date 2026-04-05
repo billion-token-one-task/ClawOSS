@@ -1,7 +1,7 @@
 # PR Analyst Sub-Agent Template (Always-On, Persistent)
 
 ## Purpose
-Persistent intelligence layer — continuously analyzes the BillionClaw PR portfolio,
+Persistent intelligence layer — continuously analyzes the configured GitHub account PR portfolio,
 updates trust scores, calibrates the P(merge) model, maintains blocklists, and writes
 strategy recommendations. Feeds real-time data into the scoring model.
 
@@ -17,7 +17,7 @@ runTimeoutSeconds: 0
 ## CRITICAL: Script Path
 **EVERY bash block MUST start with this line:**
 ```bash
-SCRIPTS=$CLAWOSS_ROOT/scripts
+SCRIPTS=/home/ubuntu/projects/codex/ClawOSS/scripts
 ```
 All ClawOSS utility scripts are at this absolute path. You run in /tmp — relative paths WILL NOT WORK.
 
@@ -50,16 +50,16 @@ WHILE context < 70%:
 
 ```bash
 # All open PRs
-gh search prs --author BillionClaw --state open --limit 100 --json repository,number,title,url,createdAt,updatedAt
+gh search prs --author "${GITHUB_USERNAME}" --state open --limit 100 --json repository,number,title,url,createdAt,updatedAt
 
 # All closed PRs (last 60 days)
-gh search prs --author BillionClaw --state closed --limit 100 --json repository,number,title,url,createdAt,closedAt --sort created
+gh search prs --author "${GITHUB_USERNAME}" --state closed --limit 100 --json repository,number,title,url,createdAt,closedAt --sort created
 
 # All merged PRs (ever)
-gh search prs --author BillionClaw "is:merged" --limit 100 --json repository,number,title,url,createdAt,closedAt
+gh search prs --author "${GITHUB_USERNAME}" "is:merged" --limit 100 --json repository,number,title,url,createdAt,closedAt
 ```
 
-ALWAYS use `BillionClaw` explicitly — `@me` fails in sub-agent contexts.
+ALWAYS use `${GITHUB_USERNAME}` explicitly — `@me` fails in sub-agent contexts.
 
 ### Step 2: Failure Mode Classification
 
@@ -141,7 +141,7 @@ Write updated trust tiers to `memory/trust-repos.md`.
 ### Step 5: Repo Blocklist Maintenance
 
 Auto-add repos to `memory/repo-blocklist.md` that match ANY:
-- Maintainer banned or threatened to ban BillionClaw
+- Maintainer banned or threatened to ban the configured GitHub account
 - Closed 3+ PRs without merge (with different failure categories — not just stale)
 - Has hostile contribution policy discovered during PR interaction
 - Maintainer explicitly said "no unsolicited PRs"

@@ -118,15 +118,15 @@ export default function OverviewPage() {
         <div className="system-header corner-brackets font-mono text-[11px] px-3 py-2 flex items-center justify-between flex-wrap gap-x-4 gap-y-1">
           <div className="flex items-center gap-3">
             <span className="text-foreground/80 font-bold tracking-tight">
-              <ScrambleText text="CLAWOSS" speed={40} scrambleFrames={14} stagger={30} />
+              <ScrambleText text="BillionClaw" speed={40} scrambleFrames={14} stagger={30} />
             </span>
             <span className="text-muted-foreground/20">|</span>
             <span className="text-muted-foreground/50">
-              <ScrambleText text="autonomous oss contributor" speed={25} scrambleFrames={8} stagger={12} />
+              <ScrambleText text="showcase pull request portfolio" speed={25} scrambleFrames={8} stagger={12} />
             </span>
           </div>
           <div className="flex items-center gap-3 text-muted-foreground/40">
-            <span>kimi-k2.5</span>
+            <span>billionclaw-demo</span>
             <span className="text-muted-foreground/15">|</span>
             <span>parallel-agents</span>
             <span className="text-muted-foreground/15">|</span>
@@ -221,7 +221,7 @@ export default function OverviewPage() {
                 {connectionData.pipeline.errorsLastHour}
               </span></span>
               <span className="text-muted-foreground/10">|</span>
-              <span>model <span className="text-foreground/45">kimi-k2.5</span></span>
+              <span>source <span className="text-foreground/45">github/BillionClaw</span></span>
               <span>cost <span className="text-foreground/45">$0.60/$3.00/M</span></span>
               <span className="text-muted-foreground/10">|</span>
               <span>pii <span className="text-foreground/45">off</span></span>

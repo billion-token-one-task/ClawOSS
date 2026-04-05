@@ -7,9 +7,10 @@ REPO="${1:?Usage: check-supersession.sh <owner/repo> <issue_number>}"
 ISSUE="${2:?Usage: check-supersession.sh <owner/repo> <issue_number>}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 RECORD_DECISIONS="${CLAWOSS_RECORD_DECISIONS:-0}"
+. "$SCRIPT_DIR/lib/github-rate-limit.sh"
 
 # 1. Linked open PRs
-LINKED=$(gh api "repos/${REPO}/issues/${ISSUE}/timeline" --jq '[.[] | select(.event=="cross-referenced") | .source.issue | select(.pull_request != null and .state == "open")] | length' 2>/dev/null || echo 0)
+LINKED=$(gh_cached_api 900 "repos/${REPO}/issues/${ISSUE}/timeline" --jq '[.[] | select(.event=="cross-referenced") | .source.issue | select(.pull_request != null and .state == "open")] | length' 2>/dev/null || echo 0)
 [[ "$LINKED" =~ ^[0-9]+$ ]] || LINKED=0
 if [ "$LINKED" -gt 0 ]; then
   if [ "$RECORD_DECISIONS" = "1" ]; then
@@ -25,7 +26,7 @@ if [ "$LINKED" -gt 0 ]; then
 fi
 
 # 2. Assignees (validate response is not an error)
-ASSIGNEES=$(gh api "repos/${REPO}/issues/${ISSUE}" --jq '.assignees[].login' 2>/dev/null || echo "")
+ASSIGNEES=$(gh_cached_api 900 "repos/${REPO}/issues/${ISSUE}" --jq '.assignees[].login' 2>/dev/null || echo "")
 # Filter out API error responses (404s contain "message" field)
 if echo "$ASSIGNEES" | grep -q "message"; then
   ASSIGNEES=""
@@ -44,7 +45,7 @@ if [ -n "$ASSIGNEES" ]; then
 fi
 
 # 3. Someone claimed it
-CLAIMED=$(gh api "repos/${REPO}/issues/${ISSUE}/comments" --jq '[.[] | select(.body | test("I.ll take|I.m working|I will fix|working on a fix"; "i"))] | length' 2>/dev/null || echo 0)
+CLAIMED=$(gh_cached_api 900 "repos/${REPO}/issues/${ISSUE}/comments" --jq '[.[] | select(.body | test("I.ll take|I.m working|I will fix|working on a fix"; "i"))] | length' 2>/dev/null || echo 0)
 [[ "$CLAIMED" =~ ^[0-9]+$ ]] || CLAIMED=0
 if [ "$CLAIMED" -gt 0 ]; then
   if [ "$RECORD_DECISIONS" = "1" ]; then
@@ -60,7 +61,8 @@ if [ "$CLAIMED" -gt 0 ]; then
 fi
 
 # 4. Competing open PRs
-COMPETING=$(gh pr list --repo "$REPO" --state open --search "$ISSUE" --json number,author --jq '[.[] | select(.author.login != "BillionClaw")] | length' 2>/dev/null || echo 0)
+AGENT_USER="${GITHUB_USERNAME:-${CLAW_AGENT_USERNAME:-clawoss-bot}}"
+COMPETING=$(gh_cached_pr_list 900 --repo "$REPO" --state open --search "$ISSUE" --json number,author --jq --arg agent "$AGENT_USER" '[.[] | select(.author.login != $agent)] | length' 2>/dev/null || echo 0)
 [[ "$COMPETING" =~ ^[0-9]+$ ]] || COMPETING=0
 if [ "$COMPETING" -gt 0 ]; then
   if [ "$RECORD_DECISIONS" = "1" ]; then

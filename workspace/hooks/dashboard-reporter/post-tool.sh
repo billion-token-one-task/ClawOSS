@@ -6,7 +6,7 @@
 DASHBOARD_URL="${DASHBOARD_URL:-https://clawoss-dashboard.vercel.app}"
 API_KEY="${CLAW_API_KEY:?Set CLAW_API_KEY env var}"
 SESSION_ID="${CLAUDE_SESSION_ID:-agent-session}"
-DEFAULT_MODEL="${CLAWOSS_DEFAULT_MODEL:-minimax/MiniMax-M2.7}"
+DEFAULT_MODEL="${CLAWOSS_PRIMARY_MODEL:-${CLAWOSS_DEFAULT_MODEL:-minimax/MiniMax-M2.7}}"
 
 # Read the hook input from stdin
 INPUT=$(cat 2>/dev/null || echo '{}')

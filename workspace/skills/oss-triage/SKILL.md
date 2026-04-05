@@ -39,7 +39,7 @@ Read `memory/trust-repos.md` Deprioritized section. If the repo appears there AN
 ### 0c. Repo Health Gate (MANDATORY — check BEFORE spending triage tokens)
 **We only contribute to repos that will actually review and merge our work.**
 
-Run `$CLAWOSS_ROOT/scripts/repo-health-check.sh {owner}/{repo}` or quick-check via `gh api`
+Run `/home/ubuntu/projects/codex/ClawOSS/scripts/repo-health-check.sh {owner}/{repo}` or quick-check via `gh api`
 (use cached results from `memory/repos/` if available and < 24 hours old):
 
 ```bash
@@ -59,7 +59,7 @@ gh pr list --repo {owner}/{repo} --state all --json comments,reviews --limit 20
 gh pr list --repo {owner}/{repo} --state open --json number --jq 'length'
 ```
 
-**HARD SKIP if `$CLAWOSS_ROOT/scripts/repo-health-check.sh` exits 1.** The script checks (with tiered thresholds for large repos):
+**HARD SKIP if `/home/ubuntu/projects/codex/ClawOSS/scripts/repo-health-check.sh` exits 1.** The script checks (with tiered thresholds for large repos):
 - Stars < 200
 - No commits in last 2 weeks
 - 0 merged PRs in last 30 days
@@ -73,7 +73,7 @@ gh pr list --repo {owner}/{repo} --state open --json number --jq 'length'
 Write "SKIP: repo health gate failed — {reason}" and cache the result.
 
 ### 0d. Dedup Check
-Run `gh search prs --author BillionClaw --repo {owner}/{repo} --state open --json number --jq 'length'`.
+Run `gh search prs --author "${GITHUB_USERNAME}" --repo {owner}/{repo} --state open --json number --jq 'length'`.
 If > 0, SKIP: "already have an active PR on this repo — focus on follow-ups instead."
 
 ### 0e. Supersession Check (CRITICAL — prevents wasted cycles)
@@ -115,7 +115,7 @@ fi
 If linked PRs, assignees, closed state, or recent fixes found, SKIP with reason `superseded`, `assigned`, or `already_fixed_upstream`. Mark in pr-ledger.md so we don't re-check.
 Also record the guardrail rejection:
 ```bash
-bash "$CLAWOSS_ROOT/scripts/record-decision.sh" issue_guardrail \
+bash "/home/ubuntu/projects/codex/ClawOSS/scripts/record-decision.sh" issue_guardrail \
   --repo {owner}/{repo} \
   --issue {number} \
   --selected false \
@@ -268,7 +268,7 @@ Include P(merge) in the output alongside the quality score.
 
 When an issue passes triage and is added to the queue, record the choice:
 ```bash
-bash "$CLAWOSS_ROOT/scripts/record-decision.sh" triage_accept \
+bash "/home/ubuntu/projects/codex/ClawOSS/scripts/record-decision.sh" triage_accept \
   --repo {owner}/{repo} \
   --issue {number} \
   --selected true \

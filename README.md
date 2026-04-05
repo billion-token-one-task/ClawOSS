@@ -40,8 +40,13 @@ Host requirements:
 Minimum env values:
 
 - `GITHUB_TOKEN`
-- `MINIMAX_API_KEY`
+- one provider key for the model you selected in `.env`:
+  `OPENAI_API_KEY`, `OPENROUTER_API_KEY`, `DEEPSEEK_API_KEY`, `MINIMAX_API_KEY`, `KIMI_API_KEY`, or `CUSTOM_OPENAI_API_KEY`
 - `CLAW_API_KEY`
+
+Model selection is env-driven. Set `CLAWOSS_PRIMARY_MODEL` and optional
+`CLAWOSS_FALLBACK_MODEL` / `CLAWOSS_SUBAGENT_MODEL` in `provider/model` format,
+for example `openai/gpt-4.1` or `openrouter/openai/gpt-4.1-mini`.
 
 ## What Changed vs. the Previous Version
 

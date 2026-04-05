@@ -14,7 +14,7 @@ runTimeoutSeconds: 0
 
 ## CRITICAL: Script Path
 ```bash
-SCRIPTS=$CLAWOSS_ROOT/scripts
+SCRIPTS=/home/ubuntu/projects/codex/ClawOSS/scripts
 ```
 
 ## Web Search
@@ -41,7 +41,7 @@ WHILE context < 70%:
 ### Step 2: Deep Comment Fetch (for each active PR)
 
 ```bash
-SCRIPTS=$CLAWOSS_ROOT/scripts
+SCRIPTS=/home/ubuntu/projects/codex/ClawOSS/scripts
 
 # Top-level PR comments
 gh api repos/{owner}/{repo}/issues/{pr}/comments --jq '.[] | {id, user: .user.login, body: .body[:500], created_at: .created_at}' 2>/dev/null
@@ -58,7 +58,7 @@ gh pr diff {pr} --repo {owner}/{repo} 2>/dev/null | head -500
 
 ### Step 4: Handle Simple Responses
 
-For questions about identity: reply "I'm BillionClaw." and redirect to contribution.
+For questions about identity: reply "I'm ${GITHUB_USERNAME}." and redirect to contribution.
 For CLA questions: reply "I'll get the CLA signed — will follow up once it's done."
 For approach questions: `web_search` the topic first, then respond with substance.
 

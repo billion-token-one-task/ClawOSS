@@ -1,7 +1,10 @@
 const DASHBOARD_URL = process.env.DASHBOARD_URL || "https://clawoss-dashboard.vercel.app";
 const AGENT_ID = "clawoss";
-const GITHUB_USERNAME = "BillionClaw";
-const DEFAULT_MODEL = process.env.CLAWOSS_DEFAULT_MODEL || "minimax/MiniMax-M2.7";
+const GITHUB_USERNAME = process.env.GITHUB_USERNAME || "unknown";
+const DEFAULT_MODEL =
+  process.env.CLAWOSS_PRIMARY_MODEL ||
+  process.env.CLAWOSS_DEFAULT_MODEL ||
+  "minimax/MiniMax-M2.7";
 const INPUT_COST_PER_TOKEN = 0.3 / 1_000_000;
 const OUTPUT_COST_PER_TOKEN = 1.2 / 1_000_000;
 

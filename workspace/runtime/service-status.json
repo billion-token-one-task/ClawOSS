@@ -1,0 +1,12 @@
+{
+  "updatedAt": "2026-04-03T23:22:42.647336Z",
+  "source": "restart.sh",
+  "overall": "running",
+  "gateway": "running",
+  "dashboardSync": "running",
+  "runCycle": "running",
+  "agentRegistered": true,
+  "workspaceLinked": true,
+  "health": "pass",
+  "note": "ClawOSS runtime active"
+}

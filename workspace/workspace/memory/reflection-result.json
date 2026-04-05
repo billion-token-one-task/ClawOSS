@@ -1,0 +1,128 @@
+{
+  "insights": [
+    {
+      "theme": "Trust-repo concentration is working",
+      "evidence": [
+        "DioCrafts/OxiCloud has 2 merged PRs, 0 open, and a recorded 100% merge rate with fast review turnaround.",
+        "Current trusted-repo list shows only a small number of active targets, which matches the mission to build repeatable success in a few repos rather than scattering effort."
+      ],
+      "implication": "Continue prioritizing repositories where maintainers have already merged work quickly and where contribution scope stays small and reviewable."
+    },
+    {
+      "theme": "Recent failures were mostly process failures, not code-quality rejections",
+      "evidence": [
+        "OxiCloud #259 failed at pre_submit with gate_failed.",
+        "OxiCloud #252 failed because implementation completed without the required output artifact.",
+        "immichFrame/ImmichFrame #617 was rejected at task admission due to repo health, before implementation started."
+      ],
+      "implication": "The immediate bottleneck is execution discipline and gating hygiene, not lack of candidate issues or inability to produce patches."
+    },
+    {
+      "theme": "Upstream drift and duplicate work are a recurring source of wasted effort",
+      "evidence": [
+        "The PR ledger shows multiple issues marked superseded or already_fixed_upstream.",
+        "This pattern appears across several repos, including kubernetes-mcp-server and OxiCloud."
+      ],
+      "implication": "Issue freshness validation must happen immediately before implementation and again before submission to avoid stale work."
+    },
+    {
+      "theme": "Open PR portfolio should stay narrow",
+      "evidence": [
+        "MiniZinc/libminizinc has an open PR blocked by CI.",
+        "pallets/jinja has an open PR awaiting review.",
+        "Work queue already includes Open-PS2-Loader#1689 waiting on maintainer, and some repos are explicitly marked saturated."
+      ],
+      "implication": "Do not increase parallel PR count aggressively; focus on follow-through and only add new submissions in high-confidence repos."
+    }
+  ],
+  "pattern_identified": {
+    "primary_pattern": "Recent unsuccessful cycles are dominated by stale-target selection and internal process misses rather than maintainer rejection.",
+    "supporting_patterns": [
+      "Trusted repos with prior merges are producing the best outcomes.",
+      "Candidate discovery in broad search is yielding many invalid, already-fixed, or low-health targets.",
+      "Controller/output-contract compliance needs stricter checks before marking implementation complete."
+    ]
+  },
+  "strategy_changes": [
+    {
+      "change": "Adopt a strict pre-implementation freshness gate",
+      "why": "Multiple prior targets were already fixed upstream or superseded.",
+      "action": [
+        "Before starting implementation, confirm the issue is still open, unclaimed by an active PR, and not already fixed on default branch.",
+        "Repeat this check immediately before submission if implementation took non-trivial time."
+      ]
+    },
+    {
+      "change": "Prioritize trust-repo follow-ups over broad discovery when there are open reviewable paths",
+      "why": "Merge-rate evidence is strongest in a small set of repositories, especially OxiCloud.",
+      "action": [
+        "Check trusted repos and current open PRs first each cycle.",
+        "Only expand discovery when trust repos lack safe, valid, small-scope work."
+      ]
+    },
+    {
+      "change": "Add a hard completion checklist for controller artifacts",
+      "why": "One recent implementation failed solely because the required output file was missing.",
+      "action": [
+        "Before declaring any stage complete, verify the required result file exists and contains all contract fields.",
+        "Treat missing artifacts as a blocking error before handoff."
+      ]
+    },
+    {
+      "change": "Tighten admission criteria for non-trusted repos",
+      "why": "Recent exploration hit unhealthy repos and saturated ecosystems.",
+      "action": [
+        "Require passing repo-health checks and low PR saturation before any new implementation starts.",
+        "Prefer docs/typo/test fixes in mature projects over ambiguous bug fixes in unfamiliar repos."
+      ]
+    },
+    {
+      "change": "Keep PR size and concurrency low",
+      "why": "Small, fast-review submissions align with the best observed outcomes and reduce failure recovery cost.",
+      "action": [
+        "Target one or two active open PRs plus at most one fresh implementation at a time.",
+        "Bias toward minimal diffs well under the 200-line hard cap."
+      ]
+    }
+  ],
+  "repos_to_deprioritize": [
+    {
+      "repo": "immichFrame/ImmichFrame",
+      "reason": "Most recent evaluated issue failed repo-health admission, so it should not consume near-term implementation cycles until health improves or a clearly exceptional opportunity appears."
+    },
+    {
+      "repo": "BerriAI/litellm",
+      "reason": "Already marked CLA blocked and permanent deprioritize; keep excluded."
+    },
+    {
+      "repo": "dspy-ai/dspy",
+      "reason": "Already marked anti-bot policy and permanent deprioritize; keep excluded."
+    },
+    {
+      "repo": "browser-use/browser-use",
+      "reason": "Explicitly saturated with too many open PRs, reducing merge odds for additional submissions."
+    },
+    {
+      "repo": "vercel/ai",
+      "reason": "Explicitly saturated with many open PRs and no recorded merges in the current operating notes."
+    }
+  ],
+  "repos_to_prioritize": [
+    {
+      "repo": "DioCrafts/OxiCloud",
+      "reason": "Best demonstrated trust signal: 2 merged PRs, 0 open, fast maintainer response, and known fork setup."
+    },
+    {
+      "repo": "pallets/jinja",
+      "reason": "Already has an open PR with passing CI, indicating healthy review conditions and a viable relationship worth continuing."
+    },
+    {
+      "repo": "MiniZinc/libminizinc",
+      "reason": "Open PR exists; despite CI blockage, it remains a live trust-building thread and should be monitored for actionable follow-up rather than abandoned."
+    },
+    {
+      "repo": "ps2homebrew/Open-PS2-Loader",
+      "reason": "Current queue marks issue #1689 as clean and waiting on maintainer, suggesting a potentially healthy submission path if future work is needed there."
+    }
+  ]
+}

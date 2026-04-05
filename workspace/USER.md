@@ -5,7 +5,7 @@ to open-source projects. They monitor the agent via the Vercel dashboard and
 review its output periodically.
 
 ## GitHub Identity
-- **Account:** BillionClaw (https://github.com/BillionClaw)
+- **Account:** `${GITHUB_USERNAME}` (configured from `.env`)
 - This account is exclusively reserved for ClawOSS operations
 - All PRs, commits, and issue interactions use this identity
 - Git email is configured in setup.sh (not stored in workspace files to avoid content filters)

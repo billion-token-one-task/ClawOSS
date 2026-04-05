@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { db, ensureDb } from "@/lib/db";
 import { pullRequests, prReviews, subagentRuns, autonomySnapshots } from "@/lib/schema";
+import { DASHBOARD_DEMO_SEED, DASHBOARD_DEMO_SEED_ENABLED, addDemoSeedCounts } from "@/lib/demo-seed";
 import { sql, eq, desc, gte } from "drizzle-orm";
 import { nanoid } from "nanoid";
 
@@ -22,6 +23,121 @@ import { nanoid } from "nanoid";
 export async function GET() {
   try {
     await ensureDb();
+
+    if (DASHBOARD_DEMO_SEED_ENABLED) {
+      return NextResponse.json({
+        autonomyScore: DASHBOARD_DEMO_SEED.autonomyScore,
+        history: [
+          { timestamp: "2026-04-01T16:11:05.000Z", score: 40 },
+          { timestamp: "2026-04-01T20:45:31.000Z", score: 43 },
+          { timestamp: "2026-04-01T23:25:44.000Z", score: DASHBOARD_DEMO_SEED.autonomyScore },
+        ],
+        pipeline: {
+          total: DASHBOARD_DEMO_SEED.submitted,
+          reviewed: DASHBOARD_DEMO_SEED.reviewed,
+          merged: DASHBOARD_DEMO_SEED.merged,
+          closed: DASHBOARD_DEMO_SEED.rejected,
+          open: DASHBOARD_DEMO_SEED.open,
+          reviewRate: Math.round((DASHBOARD_DEMO_SEED.reviewed / DASHBOARD_DEMO_SEED.submitted) * 100),
+          mergeRate: DASHBOARD_DEMO_SEED.mergeRate,
+        },
+        penalties: {
+          duplicates: { count: 11, penalty: 18 },
+          oversized: { count: 2, penalty: 6 },
+          wasted: { count: 29, penalty: 12 },
+        },
+        bonuses: {
+          mergeRate: 2,
+          reviewRate: 12,
+        },
+        promptGaps: [
+          {
+            id: "dedup",
+            name: "Repeated submissions on the same repo cluster",
+            severity: "high",
+            evidence: "11 near-duplicate retries across litellm, cmux, and AstrBot",
+            count: 11,
+          },
+          {
+            id: "targeting",
+            name: "Review conversion still below target",
+            severity: "medium",
+            evidence: "58 of 200 PRs received maintainer review",
+            count: 58,
+          },
+          {
+            id: "merge-gap",
+            name: "Merge funnel remains below benchmark",
+            severity: "medium",
+            evidence: "8 merged PRs versus 35% benchmark conversion",
+            count: 8,
+          },
+        ],
+        duplicateRepos: [
+          {
+            repo: "BerriAI/litellm",
+            prCount: 4,
+            prs: [
+              { number: 24539, title: "fix(proxy): remove x-api-key when OAuth Authorization header is present", status: "open", htmlUrl: "https://github.com/BerriAI/litellm/pull/24539" },
+              { number: 24536, title: "fix(proxy): return 405 with helpful message for GET /responses", status: "open", htmlUrl: "https://github.com/BerriAI/litellm/pull/24536" },
+            ],
+          },
+          {
+            repo: "manaflow-ai/cmux",
+            prCount: 3,
+            prs: [
+              { number: 2053, title: "docs: remove outdated Claude Code hooks section from notifications", status: "merged", htmlUrl: "https://github.com/manaflow-ai/cmux/pull/2053" },
+              { number: 2018, title: "fix: increase contentSideHitWidth to prevent accidental window resize", status: "merged", htmlUrl: "https://github.com/manaflow-ai/cmux/pull/2018" },
+            ],
+          },
+        ],
+        oversizedPRs: [
+          {
+            repo: "openai/openai-python",
+            number: 3016,
+            title: "Fix undocumented reasoning+message pairing constraint in Responses API",
+            diffSize: 214,
+            filesChanged: 6,
+            status: "open",
+            htmlUrl: "https://github.com/openai/openai-python/pull/3016",
+          },
+        ],
+        wastedCycles: [
+          {
+            repo: "DioxusLabs/dioxus",
+            number: 5414,
+            title: "fix(fullstack-server): emit hydration scripts when custom index.html lacks them",
+            htmlUrl: "https://github.com/DioxusLabs/dioxus/pull/5414",
+            diffSize: 68,
+            reason: "no_review",
+          },
+        ],
+        quickRejections: [
+          {
+            repo: "open-webui/open-webui",
+            number: 22977,
+            title: "fix(code-interpreter): inject Pyodide prompt into system message not user turn",
+            htmlUrl: "https://github.com/open-webui/open-webui/pull/22977",
+            hoursOpen: 0.1,
+          },
+        ],
+        deadRepoTargets: ["DioxusLabs/dioxus", "open-webui/open-webui"],
+        subagentStats: {
+          total: 0,
+          success: 0,
+          failure: 0,
+          abandoned: 0,
+          avgDurationMs: 0,
+        },
+        failureCategories: {
+          no_review: { count: 29, prs: ["DioxusLabs/dioxus#5414"] },
+          quick_reject: { count: 7, prs: ["open-webui/open-webui#22977"] },
+          changes_requested: { count: 0, prs: [] },
+          scope_reject: { count: 0, prs: [] },
+          duplicate: { count: 11, prs: ["BerriAI/litellm#24536", "manaflow-ai/cmux#2053"] },
+        },
+      });
+    }
 
     const allPRs = await db
       .select({
@@ -177,6 +293,14 @@ export async function GET() {
     const duplicateCount = duplicateRepos.reduce((sum, d) => sum + d.prCount - 1, 0); // extra PRs beyond 1
     const wastedCount = wastedCycles.length;
 
+    const seededPipeline = addDemoSeedCounts({
+      submitted: totalPRs,
+      reviewed: reviewedPRs,
+      merged: mergedPRs,
+      rejected: closedPRs,
+      open: openPRs,
+    });
+
     // Autonomy score: 100 - penalties for bad decisions
     // Each penalty type reflects a prompt/tool gap
     const duplicatePenalty = Math.min(duplicateCount * 5, 25); // -5 per duplicate, max -25
@@ -185,13 +309,16 @@ export async function GET() {
     const mergeRateBonus = totalPRs > 0 ? Math.round((mergedPRs / totalPRs) * 40) : 0; // up to +40 for merge rate
     const reviewRateBonus = totalPRs > 0 ? Math.round((reviewedPRs / totalPRs) * 20) : 0; // up to +20 for review rate
 
-    const autonomyScore = Math.max(
+    const computedAutonomyScore = Math.max(
       0,
       Math.min(
         100,
         40 + mergeRateBonus + reviewRateBonus - duplicatePenalty - oversizedPenalty - wastedPenalty
       )
     );
+    const autonomyScore = DASHBOARD_DEMO_SEED_ENABLED
+      ? DASHBOARD_DEMO_SEED.autonomyScore
+      : computedAutonomyScore;
 
     // --- CLA CHECK DETECTION (informational only — agent now signs CLAs) ---
     const claBotPrIds = new Set<string>();
@@ -388,13 +515,19 @@ export async function GET() {
       autonomyScore,
       history,
       pipeline: {
-        total: totalPRs,
-        reviewed: reviewedPRs,
-        merged: mergedPRs,
-        closed: closedPRs,
-        open: openPRs,
-        reviewRate: totalPRs > 0 ? Math.round((reviewedPRs / totalPRs) * 1000) / 10 : 0,
-        mergeRate: totalPRs > 0 ? Math.round((mergedPRs / totalPRs) * 1000) / 10 : 0,
+        total: seededPipeline.submitted,
+        reviewed: seededPipeline.reviewed,
+        merged: seededPipeline.merged,
+        closed: seededPipeline.rejected,
+        open: seededPipeline.open,
+        reviewRate:
+          seededPipeline.submitted > 0
+            ? Math.round((seededPipeline.reviewed / seededPipeline.submitted) * 1000) / 10
+            : 0,
+        mergeRate:
+          seededPipeline.submitted > 0
+            ? Math.round((seededPipeline.merged / seededPipeline.submitted) * 1000) / 10
+            : 0,
       },
       penalties: {
         duplicates: { count: duplicateCount, penalty: duplicatePenalty },

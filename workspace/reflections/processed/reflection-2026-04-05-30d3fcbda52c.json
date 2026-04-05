@@ -1,0 +1,34 @@
+{
+  "id": "reflection-2026-04-05-30d3fcbda52c",
+  "timestamp": "2026-04-05T17:16:14.010Z",
+  "scope": "daily",
+  "strategyVersion": "bootstrap-v1",
+  "sourceWindowStart": "2026-04-04T17:16:14.010Z",
+  "sourceWindowEnd": "2026-04-05T17:16:14.010Z",
+  "summary": "Window 2026-04-04T17:16:14.010Z to 2026-04-05T17:16:14.010Z: 338/340 decisions selected, 0 merged, 0 reviewed, 0 tracked outcomes.",
+  "insights": [],
+  "recommendedChanges": [],
+  "confidence": 0.61,
+  "applied": false,
+  "metadata": {
+    "generatedBy": "reflection_mvp",
+    "windowHours": 24,
+    "decisionsSummary": {
+      "total": 340,
+      "selected": 338,
+      "stageCounts": {
+        "repo_health_gate": 340
+      },
+      "avgExpectedMergeProb": null,
+      "totalExpectedTokenCost": 0
+    },
+    "outcomesSummary": {
+      "total": 0,
+      "counts": {},
+      "tokenCost": 0,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "topFailure": null
+    }
+  }
+}

@@ -3,12 +3,33 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { db, ensureDb } from "@/lib/db";
 import { heartbeats, agentLogs } from "@/lib/schema";
+import { DASHBOARD_DEMO_SEED_ENABLED } from "@/lib/demo-seed";
 import { desc, gte, eq, and, sql } from "drizzle-orm";
 
 export async function GET() {
   try {
     await ensureDb();
     const now = new Date();
+    if (DASHBOARD_DEMO_SEED_ENABLED) {
+      return NextResponse.json({
+        heartbeat: {
+          lastBeat: now,
+          intervalMinutes: 5,
+          streak: 12,
+        },
+        uptime: {
+          percentage: 96,
+          since: new Date(now.getTime() - 24 * 60 * 60 * 1000),
+          totalDowntimeMinutes: 60,
+        },
+        errorRate: {
+          perHour: 0,
+          trend: "stable",
+          lastError: null,
+        },
+        sessions: [],
+      });
+    }
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
     // Heartbeat data

@@ -13,10 +13,22 @@ trap cleanup EXIT
 
 PROJECT_DIR="$TEST_PROJECT" bash "$ROOT/scripts/init-workspace-state.sh" >/dev/null
 
-cat > "$TEST_PROJECT/workspace/runtime/processed/decisions/decision-1.json" <<'EOF'
+DECISION_TS="$(python3 - <<'PY'
+from datetime import datetime, timedelta, timezone
+print((datetime.now(timezone.utc) - timedelta(hours=2)).isoformat().replace("+00:00", "Z"))
+PY
+)"
+
+OUTCOME_TS="$(python3 - <<'PY'
+from datetime import datetime, timedelta, timezone
+print((datetime.now(timezone.utc) - timedelta(hours=1)).isoformat().replace("+00:00", "Z"))
+PY
+)"
+
+cat > "$TEST_PROJECT/workspace/runtime/processed/decisions/decision-1.json" <<EOF
 {
   "id": "decision-1",
-  "timestamp": "2026-03-30T10:00:00.000Z",
+  "timestamp": "$DECISION_TS",
   "stage": "queue_pick",
   "repo": "example/project",
   "issueNumber": 12,
@@ -27,10 +39,10 @@ cat > "$TEST_PROJECT/workspace/runtime/processed/decisions/decision-1.json" <<'E
 }
 EOF
 
-cat > "$TEST_PROJECT/workspace/runtime/processed/outcomes/outcome-1.json" <<'EOF'
+cat > "$TEST_PROJECT/workspace/runtime/processed/outcomes/outcome-1.json" <<EOF
 {
   "id": "outcome-1",
-  "timestamp": "2026-03-30T12:00:00.000Z",
+  "timestamp": "$OUTCOME_TS",
   "repo": "example/project",
   "issueNumber": 12,
   "outcome": "reviewed",

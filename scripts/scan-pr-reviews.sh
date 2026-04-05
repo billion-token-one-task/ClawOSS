@@ -34,6 +34,7 @@ CI_CHECKS="unknown"
 # ─── 5. Classify ───
 python3 -c "
 import json
+import os
 
 reviews = $REVIEWS
 comments = $COMMENTS
@@ -52,7 +53,8 @@ has_approval = 'APPROVED' in states
 has_changes = 'CHANGES_REQUESTED' in states
 
 # Unanswered maintainer comments
-unanswered = [c for c in comments if c['user'] != 'BillionClaw'][:1]
+agent_user = os.environ.get('GITHUB_USERNAME') or os.environ.get('CLAW_AGENT_USERNAME') or 'clawoss-bot'
+unanswered = [c for c in comments if c['user'] != agent_user][:1]
 
 # Determine state + action
 if has_changes:

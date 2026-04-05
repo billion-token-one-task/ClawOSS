@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { db, ensureDb } from "@/lib/db";
 import { pullRequests } from "@/lib/schema";
+import { DASHBOARD_DEMO_SEED_ENABLED, getDemoPullRequests } from "@/lib/demo-seed";
 import { desc, asc, eq, gte, like, and, sql } from "drizzle-orm";
 
 export async function GET(request: Request) {
@@ -17,6 +18,44 @@ export async function GET(request: Request) {
     const order = url.searchParams.get("order") || "desc";
     const minQuality = parseFloat(url.searchParams.get("minQuality") || "0");
     const search = url.searchParams.get("search") || "";
+
+    if (DASHBOARD_DEMO_SEED_ENABLED) {
+      let data = [...getDemoPullRequests()];
+
+      if (status !== "all") {
+        data = data.filter((pr) => pr.status === status);
+      }
+      if (repo !== "all") {
+        data = data.filter((pr) => pr.repo === repo);
+      }
+      if (minQuality > 0) {
+        data = data.filter((pr) => (pr.qualityScore || 0) >= minQuality);
+      }
+      if (search) {
+        const lowered = search.toLowerCase();
+        data = data.filter(
+          (pr) =>
+            pr.title.toLowerCase().includes(lowered) ||
+            pr.repo.toLowerCase().includes(lowered)
+        );
+      }
+
+      const sorted = data.sort((a, b) => {
+        const direction = order === "asc" ? 1 : -1;
+        if (sort === "quality") {
+          return (((a.qualityScore || 0) - (b.qualityScore || 0)) * direction);
+        }
+        return ((new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * direction);
+      });
+
+      const offset = (page - 1) * limit;
+      return NextResponse.json({
+        data: sorted.slice(offset, offset + limit),
+        total: 200,
+        page,
+        pageSize: limit,
+      });
+    }
 
     const conditions = [];
 

@@ -11,33 +11,35 @@ if [ "${1:-}" = "--help" ] || [ $# -lt 1 ]; then
 fi
 
 REPO="$1"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+. "$SCRIPT_DIR/lib/github-rate-limit.sh"
 
 # 1. Recent commits — what are maintainers actively working on?
-RECENT_COMMITS=$(gh api "repos/${REPO}/commits?per_page=20" \
+RECENT_COMMITS=$(gh_cached_api 1800 "repos/${REPO}/commits?per_page=20" \
   --jq '[.[].commit.message | split("\n")[0]]' 2>/dev/null || echo '[]')
 
 # 2. High-engagement issues — what do maintainers care about?
-HIGH_COMMENT_ISSUES=$(gh api "repos/${REPO}/issues?state=open&sort=comments&direction=desc&per_page=10" \
+HIGH_COMMENT_ISSUES=$(gh_cached_api 1800 "repos/${REPO}/issues?state=open&sort=comments&direction=desc&per_page=10" \
   --jq '[.[] | {number, title, comments}]' 2>/dev/null || echo '[]')
 
 # 3. Active PRs — what external contributions get attention?
-ACTIVE_PRS=$(gh api "repos/${REPO}/pulls?state=open&sort=updated&direction=desc&per_page=10" \
+ACTIVE_PRS=$(gh_cached_api 1800 "repos/${REPO}/pulls?state=open&sort=updated&direction=desc&per_page=10" \
   --jq '[.[] | {number, title, user: .user.login}]' 2>/dev/null || echo '[]')
 
 # 4. Priority labels — maintainer focus areas
-PRIORITY_LABELS=$(gh api "repos/${REPO}/labels?per_page=50" \
+PRIORITY_LABELS=$(gh_cached_api 21600 "repos/${REPO}/labels?per_page=50" \
   --jq '[.[] | select(.name | test("priority|p0|p1|critical|next|planned|urgent"; "i")) | .name]' 2>/dev/null || echo '[]')
 
 # 5. Recent release — post-release = best window for bug fixes
-LATEST_RELEASE=$(gh api "repos/${REPO}/releases?per_page=1" \
+LATEST_RELEASE=$(gh_cached_api 21600 "repos/${REPO}/releases?per_page=1" \
   --jq '.[0] | {tag: .tag_name, date: .published_at, name: .name}' 2>/dev/null || echo '{"tag": null, "date": null, "name": null}')
 
 # 6. CHANGELOG excerpt (first 30 lines)
-CHANGELOG=$(gh api "repos/${REPO}/contents/CHANGELOG.md" \
+CHANGELOG=$(gh_cached_api 21600 "repos/${REPO}/contents/CHANGELOG.md" \
   --jq '.content' 2>/dev/null | base64 -d 2>/dev/null | head -30 | python3 -c "import sys,json; print(json.dumps(sys.stdin.read()))" 2>/dev/null || echo '""')
 
 # 7. Default branch
-DEFAULT_BRANCH=$(gh api "repos/${REPO}" --jq '.default_branch' 2>/dev/null || echo "main")
+DEFAULT_BRANCH=$(gh_cached_api 1800 "repos/${REPO}" --jq '.default_branch' 2>/dev/null || echo "main")
 
 # Extract active modules from commit messages
 ACTIVE_MODULES=$(echo "$RECENT_COMMITS" | python3 -c "

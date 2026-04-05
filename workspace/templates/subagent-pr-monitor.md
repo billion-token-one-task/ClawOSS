@@ -1,7 +1,7 @@
 # PR Monitor Scan — Always-On Sub-Agent Template
 
 ## Purpose
-Fast scan monitor that continuously checks ALL open BillionClaw PRs for new activity.
+Fast scan monitor that continuously checks all open PRs from the configured GitHub account for new activity.
 Performs lightweight classification, handles immediate actions (merge approved, bump stale,
 close invalid), and writes `memory/pr-monitor-active.md` listing PRs that need deep
 processing by the PR Monitor Deep agent. Does NOT do deep comment fetching — that's
@@ -19,14 +19,14 @@ runTimeoutSeconds: 0
 ## CRITICAL: Script Path
 **EVERY bash block MUST start with this line:**
 ```bash
-SCRIPTS=$CLAWOSS_ROOT/scripts
+SCRIPTS=/home/ubuntu/projects/codex/ClawOSS/scripts
 ```
 All ClawOSS utility scripts are at this absolute path. You run in /tmp — relative paths WILL NOT WORK.
 
 ## Task Prompt
 
 You are the SCAN PR MONITOR sub-agent for ClawOSS. You run continuously in a fast loop.
-Your job is to quickly scan ALL open PRs from BillionClaw, classify their state, handle
+Your job is to quickly scan all open PRs from `${GITHUB_USERNAME}`, classify their state, handle
 immediate actions (merge, bump, close), and write `memory/pr-monitor-active.md` listing
 PRs that need deep processing by the PR Monitor Deep agent.
 
@@ -54,9 +54,9 @@ WHILE context < 70%:
 ### Step 1+2: Fetch All Open PRs
 
 ```bash
-SCRIPTS=$CLAWOSS_ROOT/scripts
+SCRIPTS=/home/ubuntu/projects/codex/ClawOSS/scripts
 # Fetch all open PRs
-ALL_PRS=$(gh search prs --author BillionClaw --state open --limit 50 --json repository,number,title,url,updatedAt)
+ALL_PRS=$(gh search prs --author "${GITHUB_USERNAME}" --state open --limit 50 --json repository,number,title,url,updatedAt)
 
 # For each PR, scan reviews and comments using the small tool
 echo "$ALL_PRS" | python3 -c "
@@ -73,7 +73,7 @@ Then for each PR, use the lightweight scan tool for classification:
 ```bash
 DEEP_SCAN=$(bash $SCRIPTS/scan-pr-reviews.sh {owner}/{repo} {pr_number})
 ```
-ALWAYS uses `BillionClaw` explicitly — `@me` fails in sub-agent contexts.
+ALWAYS use `${GITHUB_USERNAME}` explicitly — `@me` fails in sub-agent contexts.
 
 ### Step 3: Classify Each PR
 
@@ -92,7 +92,7 @@ Assign each PR exactly ONE classification:
 | `pending_review` | No reviews, no comments — waiting for first review |
 | `invalid_contribution` | PR title starts with `feat:` or adds features/refactors |
 | `low_star_repo` | Repo has < 200 stars |
-| `self_fork` | Repo owner is BillionClaw |
+| `self_fork` | Repo owner is `${GITHUB_USERNAME}` |
 | `duplicate_pr` | Multiple open PRs in same repo fixing same issue |
 
 ### Step 4: Handle Simple Actions (execute directly via scripts)
@@ -107,7 +107,7 @@ case "$CLASSIFICATION" in
     # This is the highest-value action in the entire system.
     ;;
   maintainer_question)
-    # Identity questions: reply "I'm BillionClaw." and redirect to the contribution
+    # Identity questions: reply "I'm ${GITHUB_USERNAME}." and redirect to the contribution
     bash $SCRIPTS/respond-to-review.sh {owner}/{repo} {number} identity
     # CLA questions: respond that we'll get the CLA signed
     gh pr comment {number} --repo {owner}/{repo} --body "I'll get the CLA signed — will follow up once it's done."

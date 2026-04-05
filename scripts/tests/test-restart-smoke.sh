@@ -21,6 +21,10 @@ EOF
 
 cat > "$TMP_BIN/gh" <<'EOF'
 #!/usr/bin/env bash
+if [ "${1:-}" = "api" ] && [ "${2:-}" = "user" ]; then
+  printf 'SmokeUser\n'
+  exit 0
+fi
 exit 0
 EOF
 

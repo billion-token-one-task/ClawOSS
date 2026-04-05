@@ -55,11 +55,11 @@ Valid types for ClawOSS: `fix` (bugs), `docs` (documentation/typos), `test` (tes
 **If branch type is `feat`, `refactor`, or `chore`: ABORT — these are not valid contribution types.**
 
 ### 5. Dedup Check (HARD GATE)
-Check for duplicate PRs targeting the same issue. ALWAYS use `BillionClaw` explicitly — `@me` fails in sub-agent contexts.
+Check for duplicate PRs targeting the same issue. ALWAYS use `${GITHUB_USERNAME}` explicitly — `@me` fails in sub-agent contexts.
 
 ### 5b. Supersession Check (HARD GATE — final check before submit)
 Re-verify no one else submitted a fix while we were working:
-- Check issue timeline for linked PRs: `gh api "repos/{owner}/{repo}/issues/{number}/timeline" --jq '[.[] | select(.event=="cross-referenced") | .source.issue | select(.pull_request != null and .state == "open")] | length'`
+- Check issue timeline for linked PRs: `/usr/bin/gh api "repos/{owner}/{repo}/issues/{number}/timeline" --jq '[.[] | select(.event=="cross-referenced") | .source.issue | select(.pull_request != null and .state == "open")] | length'`
 - If > 0: **ABORT** — another contributor submitted a fix while we were implementing. A superseded PR wastes maintainer time.
 
 ### 6. No Dangerous Commands

@@ -1,0 +1,20 @@
+{
+  "timestamp": "2026-04-03T21:19:36Z",
+  "stage": "repo_health_gate",
+  "sessionId": null,
+  "strategyVersion": "bootstrap-v1",
+  "repo": "ps2homebrew/Open-PS2-Loader",
+  "issueNumber": null,
+  "prNumber": null,
+  "selected": false,
+  "score": 10,
+  "confidence": null,
+  "expectedMergeProb": null,
+  "expectedTokenCost": null,
+  "reasoningSummary": "review rate 0% (<50%)",
+  "candidateSet": null,
+  "metadata": {
+    "failure_category": "repo_health_fail: review rate 0% below 50% minimum",
+    "threshold": 5
+  }
+}

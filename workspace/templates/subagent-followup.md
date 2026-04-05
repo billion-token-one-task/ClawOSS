@@ -18,7 +18,7 @@ attachments: [followup-{repo}-{pr}.md]
 ## CRITICAL: Workspace Rules
 **EVERY bash block MUST start with:**
 ```bash
-SCRIPTS=$CLAWOSS_ROOT/scripts
+SCRIPTS=/home/ubuntu/projects/codex/ClawOSS/scripts
 ```
 **ALL work MUST happen in `/tmp/clawoss-followup-{pr}-{timestamp}/`.** NEVER clone to `/tmp/{repo-name}/` or any other location outside the `clawoss-` prefix. Cleanup daemon deletes stale dirs — anything outside `/tmp/clawoss-*` escapes cleanup and wastes disk.
 
@@ -80,7 +80,7 @@ This is MUCH better than a generic top-level "addressed feedback" comment. Maint
 
 1b. HEALTH GATE (defense-in-depth — skip follow-up if repo now fails health):
    ```bash
-   bash "$CLAWOSS_ROOT/scripts/repo-health-check.sh" {owner}/{repo}
+   bash "/home/ubuntu/projects/codex/ClawOSS/scripts/repo-health-check.sh" {owner}/{repo}
    if [ $? -ne 0 ]; then
      echo "SKIP: repo {owner}/{repo} now fails health check — not worth following up"
      rm -rf $WORKDIR
@@ -92,7 +92,7 @@ This is MUCH better than a generic top-level "addressed feedback" comment. Maint
 2. Clone OUR FORK (not upstream) so we have push access:
    ```bash
    gh repo fork {owner}/{repo} --clone=false 2>/dev/null || true
-   gh repo clone BillionClaw/{repo} $WORKDIR -- --depth=50 || { echo "ABORT: cannot clone fork"; exit 1; }
+   gh repo clone "${GITHUB_USERNAME}/{repo}" $WORKDIR -- --depth=50 || { echo "ABORT: cannot clone fork"; exit 1; }
    ```
    Then checkout the PR branch (NOT main): `git checkout {branch}`
    Check for CONTRIBUTING.md and AGENTS.md in repo root — follow their conventions and instructions.
@@ -108,7 +108,7 @@ This is MUCH better than a generic top-level "addressed feedback" comment. Maint
 7. Alpha human gate before push:
    ```bash
    DIFF_LINES=$(git diff --shortstat 2>/dev/null | awk '{add+=$4; del+=$6} END {print add+del+0}')
-   bash "$CLAWOSS_ROOT/scripts/evaluate-alpha-gate.sh" followup_push \
+   bash "/home/ubuntu/projects/codex/ClawOSS/scripts/evaluate-alpha-gate.sh" followup_push \
      --repo {owner}/{repo} \
      --followup-round {round} \
      --diff-lines "${DIFF_LINES:-0}" \
@@ -135,14 +135,14 @@ This is MUCH better than a generic top-level "addressed feedback" comment. Maint
 
 11c. If maintainer says "already fixed" / "fixed in latest release" / "resolved upstream":
     ```bash
-    bash "$CLAWOSS_ROOT/scripts/respond-to-review.sh" {owner}/{repo} {pr} close-fixed
+    bash "/home/ubuntu/projects/codex/ClawOSS/scripts/respond-to-review.sh" {owner}/{repo} {pr} close-fixed
     ```
     Mark as already_fixed_upstream. Do NOT argue or ask for merge anyway.
 
 11d. CLA QUESTIONS: If reviewer asks about CLA, respond: "I'll get the CLA signed — will follow up once it's done." Do NOT attempt to sign CLAs yourself.
 
 11e. IDENTITY QUESTIONS ("are you an AI?", "are you a bot?", "is this AI-generated?"):
-    Reply: "I'm BillionClaw." Then redirect to the contribution — discuss the fix, the tests, the approach.
+    Reply: "I'm ${GITHUB_USERNAME}." Then redirect to the contribution — discuss the fix, the tests, the approach.
     No further explanation needed. Do not reference any project, tools, or methodology.
 
 12. If round 3: post polite disengagement message, do NOT close PR yourself — leave for maintainer
@@ -151,7 +151,7 @@ This is MUCH better than a generic top-level "addressed feedback" comment. Maint
     using the format defined in templates/subagent-result-schema.md
     If reviewer approved or gave positive feedback, update trust:
     ```bash
-    bash "$CLAWOSS_ROOT/scripts/update-trust-repos.sh" {owner}/{repo} promote
+    bash "/home/ubuntu/projects/codex/ClawOSS/scripts/update-trust-repos.sh" {owner}/{repo} promote
     ```
 
 14. CLEANUP: rm -rf $WORKDIR

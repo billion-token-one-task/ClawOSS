@@ -100,6 +100,27 @@ write_if_missing "$MEMORY_DIR/pr-ledger.md" <<'EOF'
 |--------|------|-------|--------|------------|
 EOF
 
+write_if_missing "$MEMORY_DIR/failure-log.md" <<'EOF'
+# Failure Log
+
+| timestamp | repo | issue | reason | details |
+|-----------|------|-------|--------|---------|
+EOF
+
+write_if_missing "$MEMORY_DIR/lifecycle-state.json" <<'EOF'
+{
+  "state": "idle",
+  "active_task": null,
+  "session_id": null,
+  "turn_count": 0,
+  "retry_count": 0,
+  "consecutive_failures": 0,
+  "completed_tasks": 0,
+  "last_error": null,
+  "updated_at": null
+}
+EOF
+
 write_if_missing "$MEMORY_DIR/pipeline-state.md" <<'EOF'
 # Pipeline State
 

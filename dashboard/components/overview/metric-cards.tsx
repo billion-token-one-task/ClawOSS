@@ -224,7 +224,7 @@ export function MetricCards({
             <div className="relative h-3 mt-2">
               <div className="absolute inset-x-0 top-1 h-[1px] bg-foreground/[0.04]" />
               {[
-                { label: "AI avg", pct: 32.7, color: "text-muted-foreground/25" },
+                { label: "AI avg", pct: 35, color: "text-muted-foreground/25" },
                 { label: "Copilot", pct: 35, color: "text-muted-foreground/30" },
                 { label: "Devin", pct: 49, color: "text-muted-foreground/40" },
                 { label: "Codex", pct: 64, color: "text-emerald-400/40" },

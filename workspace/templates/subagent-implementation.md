@@ -14,7 +14,7 @@ attachments: [repo-conventions.md, issue-details.md]
 ## CRITICAL: Workspace Rules
 **EVERY bash block MUST start with:**
 ```bash
-SCRIPTS=$CLAWOSS_ROOT/scripts
+SCRIPTS=/home/ubuntu/projects/codex/ClawOSS/scripts
 ```
 **ALL work MUST happen in `/tmp/clawoss-{issue}-{timestamp}/`.** NEVER clone repos to `/tmp/{repo-name}/` or any other location. NEVER run `npm install`, `pip install`, `cargo build`, or any dependency installation OUTSIDE your `/tmp/clawoss-*` workspace. This is NON-NEGOTIABLE — a cleanup daemon deletes stale dirs, and anything outside `/tmp/clawoss-*` wastes disk and escapes cleanup.
 
@@ -88,15 +88,15 @@ Read the attached repo-conventions.md and issue-details.md.
 
 1. SETUP WORKSPACE — run quick checks, then clone:
    ```bash
-   SCRIPTS=$CLAWOSS_ROOT/scripts
+   SCRIPTS=/home/ubuntu/projects/codex/ClawOSS/scripts
 
    # Quick checks (use gh directly — no scripts needed for basic gates)
    # Is issue still open?
-   STATE=$(gh api repos/{repo}/issues/{issue} --jq '.state' 2>/dev/null)
+   STATE=$(gh api repos/{repo}/issues/{issue} --jq '.state')
    [ "$STATE" = "closed" ] && echo "ABORT: issue is closed" && exit 1
 
    # Is it assigned to someone else?
-   ASSIGNEES=$(gh api repos/{repo}/issues/{issue} --jq '[.assignees[].login] | map(select(. != "BillionClaw")) | length' 2>/dev/null || echo 0)
+   ASSIGNEES=$(gh api repos/{repo}/issues/{issue} --jq '[.assignees[].login] | map(select(. != env.GITHUB_USERNAME)) | length')
    [ "$ASSIGNEES" -gt 0 ] && echo "ABORT: assigned to someone" && exit 1
 
    # Lock repo (prevents duplicate agents)
@@ -105,11 +105,11 @@ Read the attached repo-conventions.md and issue-details.md.
    # Clone — MUST be in /tmp/clawoss-* (cleanup daemon monitors this prefix)
    WORKDIR=/tmp/clawoss-{issue}-$(date +%s)
    mkdir -p $WORKDIR
-   gh repo clone {repo} $WORKDIR -- --depth=50 || exit 1
+   gh repo clone {repo} $WORKDIR -- --depth=50
    cd $WORKDIR
    # ALL subsequent work (npm install, pip install, cargo build, tests) happens HERE
    # NEVER cd to /tmp/{something-else} or clone to a different location
-   DEFAULT_BRANCH=$(gh api repos/{repo} --jq '.default_branch' 2>/dev/null || echo main)
+   DEFAULT_BRANCH=$(gh api repos/{repo} --jq '.default_branch')
    ```
    **IMPORTANT**: Use `python3` (not `python`). The `python` binary does not exist on macOS.
 
@@ -288,7 +288,7 @@ Read the attached repo-conventions.md and issue-details.md.
    # Fork and push
    gh repo fork {repo} --clone=false 2>/dev/null || true
    REPO_NAME=$(echo "{repo}" | cut -d/ -f2)
-   git remote add fork https://github.com/BillionClaw/$REPO_NAME.git 2>/dev/null || true
+   git remote add fork "https://github.com/${GITHUB_USERNAME}/$REPO_NAME.git" 2>/dev/null || true
    BRANCH=$(git branch --show-current)
    if [[ "$BRANCH" != clawoss/* ]]; then
      BRANCH="clawoss/fix/$(echo "$BRANCH" | sed 's|^main$||;s|^master$||' | head -c 50)"
@@ -297,7 +297,7 @@ Read the attached repo-conventions.md and issue-details.md.
    git push fork $BRANCH --force
 
    # Create PR
-   PR_URL=$(gh pr create --repo {repo} --head BillionClaw:$BRANCH --base $DEFAULT_BRANCH --title "$PR_TITLE" --body "$PR_BODY")
+   PR_URL=$(gh pr create --repo {repo} --head "${GITHUB_USERNAME}:$BRANCH" --base $DEFAULT_BRANCH --title "$PR_TITLE" --body "$PR_BODY")
    ```
    echo "PR created: $PR_URL"
    ```

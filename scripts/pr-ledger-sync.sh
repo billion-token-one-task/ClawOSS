@@ -4,7 +4,7 @@ set -euo pipefail
 # pr-ledger-sync.sh — Keeps workspace/memory/pr-ledger.md in sync with GitHub
 #
 # Two data sources:
-#   1. GitHub API: all PRs authored by BillionClaw (authoritative for status)
+#   1. GitHub API: all PRs authored by the configured GitHub account (authoritative for status)
 #   2. Subagent result files: picks up PRs before GitHub search indexes them
 #
 # Can run standalone or be called from dashboard-sync.sh every ~60s.
@@ -12,10 +12,11 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/lib/path-helpers.sh"
+. "$SCRIPT_DIR/lib/github-rate-limit.sh"
 PROJECT_DIR="$(clawoss_resolve_project_dir "$0")"
 LEDGER="$PROJECT_DIR/workspace/memory/pr-ledger.md"
 RESULT_DIR="$PROJECT_DIR/workspace/memory"
-AGENT_USER="${CLAW_AGENT_USERNAME:-BillionClaw}"
+AGENT_USER="${GITHUB_USERNAME:-${CLAW_AGENT_USERNAME:-clawoss-bot}}"
 RECORD_OUTCOMES="${CLAWOSS_RECORD_OUTCOMES:-0}"
 
 log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] pr-ledger-sync: $*"; }
@@ -28,7 +29,7 @@ fi
 
 # --- Collect PRs from GitHub ---
 # Search returns all PRs by the agent, sorted by most recent
-GH_PRS=$(gh search prs --author "$AGENT_USER" --limit 200 \
+GH_PRS=$(gh_cached_search_prs 600 --author "$AGENT_USER" --limit 200 \
     --json repository,number,url,state,createdAt 2>/dev/null || echo '[]')
 
 # --- Collect PRs from unprocessed subagent result files ---

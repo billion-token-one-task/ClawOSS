@@ -7,7 +7,7 @@ disable-model-invocation: false
 
 # Dashboard Reporter
 
-Send telemetry to the dashboard. Agent ID: "clawoss", user: "BillionClaw".
+Send telemetry to the dashboard. Agent ID: "clawoss", user: `${GITHUB_USERNAME}`.
 Auth: `Authorization: Bearer $CLAW_API_KEY`. All curls use `-s --max-time 10`.
 URL base: `$DASHBOARD_URL` (default: `https://clawoss-dashboard.vercel.app`)
 

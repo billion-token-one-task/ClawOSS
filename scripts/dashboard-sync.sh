@@ -23,7 +23,9 @@ else
 fi
 INTERVAL=10
 # Use persistent offset dir under workspace to survive reboots (not /tmp)
-SYNC_STATE_DIR="${CLAWOSS_WORKSPACE:-$HOME/clawOSS/workspace}/.sync-state"
+WORKSPACE_BASE="${CLAWOSS_WORKSPACE:-${CLAWOSS_ROOT:+$CLAWOSS_ROOT/workspace}}"
+[ -z "$WORKSPACE_BASE" ] && WORKSPACE_BASE="$HOME/clawOSS/workspace"
+SYNC_STATE_DIR="${WORKSPACE_BASE}/.sync-state"
 OFFSET_DIR="${SYNC_STATE_DIR}/offsets"
 SESSION_MAP="${SYNC_STATE_DIR}/session-map.json"
 LOCK_FILE="${SYNC_STATE_DIR}/dashboard-sync.pid"

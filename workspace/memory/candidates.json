@@ -1,100 +1,96 @@
 {
+  "status": "valid_discovery_output",
+  "summary": "No new high-confidence external candidates were established in this run. Preserve the stable vetted pool and continue trust-repo-first selection.",
+  "discovery_result": "no_new_high_confidence_external_candidates",
+  "strategy": [
+    "trust-repo-first",
+    "hard anti-thrash",
+    "stable vetted pool"
+  ],
+  "inputs_used": {
+    "trusted_repos_snapshot": true,
+    "pr_ledger_snapshot": true,
+    "failure_log_snapshot": true,
+    "work_queue_snapshot": true,
+    "online_search_executed": false,
+    "online_search_blocker": "No successful live query path established in this environment during recent discovery attempts"
+  },
+  "rationale": {
+    "primary": "Current evidence still supports maintaining the existing vetted pool instead of widening or reranking it.",
+    "details": [
+      "DioCrafts/OxiCloud remains the strongest trust anchor with 2 merged PRs, 0 open backlog on our side, and fast maintainer response.",
+      "MiniZinc/libminizinc and pallets/jinja remain useful Tier 2 reserve paths, but neither has gained enough new evidence to overtake OxiCloud.",
+      "No successful live query path has been re-established in this environment during recent discovery attempts, so this run cannot claim fresh externally verified candidates.",
+      "Recent reflection already concluded that admission and process reliability dominate failures, not vetted-pool quality.",
+      "Given hard anti-thrash, the correct maintenance action is to keep the current ranked pool stable until new external evidence exists."
+    ]
+  },
   "candidates": [
     {
-      "repo": "ps2homebrew/Open-PS2-Loader",
-      "issue_number": 1689,
-      "issue_url": "https://github.com/ps2homebrew/Open-PS2-Loader/issues/1689",
-      "title": "fix(compat): add SLES-51114 audio compatibility settings",
+      "repo": "DioCrafts/OxiCloud",
+      "issue": 241,
+      "url": "https://github.com/DioCrafts/OxiCloud/issues/241",
       "type": "bug",
-      "priority": 1,
-      "score": 14,
-      "why_high_signal": [
-        "Already present in work_queue with mergeable_state: clean and waiting on maintainer",
-        "Repo health passes quick screening: 2837 stars, recent push, forks allowed",
-        "Issue appears narrowly scoped to a specific compatibility fix",
-        "Avoids immediate reuse of OxiCloud issues after repeated recent implementation/admission failures"
-      ],
-      "risks": [
-        "Needs exclusivity check to ensure no active PR already covers the exact compatibility change",
-        "Validation may require emulator or hardware-specific knowledge"
-      ],
-      "recommended_next_step": "Check timeline and open PRs for overlap, then verify whether this can be handled as a small, data-oriented compatibility patch."
-    },
-    {
-      "repo": "RAIT-09/obsidian-agent-client",
-      "issue_number": 200,
-      "issue_url": "https://github.com/RAIT-09/obsidian-agent-client/issues/200",
-      "title": "Stop can cause the next assistant reply to be swallowed/misordered until another user message is sent",
-      "type": "bug",
-      "priority": 2,
-      "score": 13,
-      "why_high_signal": [
-        "Repo clears quick health checks: 1455 stars, pushed today, forks allowed",
-        "Issue is fresh, open, unassigned, and clearly framed as incorrect behavior",
-        "Bug statement sounds reproducible and bounded to reply ordering / stop handling"
-      ],
-      "risks": [
-        "New repo with no trust history yet",
-        "Concurrency/state bugs can be trickier than the issue title suggests"
-      ],
-      "recommended_next_step": "Read issue details and implementation area to confirm the bug has a small, testable surface before selecting it for work."
+      "priority_tier": 1,
+      "score": 24,
+      "confidence": "high",
+      "reason": "Primary trust-repo candidate. Repo has 2 merged PRs, 0 open backlog on our side, 100% historical merge rate, and fast maintainer response. No current snapshot evidence invalidates it. Must still pass strict admission/preflight before implementation.",
+      "status": "frontline"
     },
     {
       "repo": "MiniZinc/libminizinc",
-      "issue_number": 1005,
-      "issue_url": "https://github.com/MiniZinc/libminizinc/issues/1005",
-      "title": "MiniZinc ignores overloads for Boolean counting constraints",
+      "issue": 1005,
+      "url": "https://github.com/MiniZinc/libminizinc/issues/1005",
       "type": "bug",
-      "priority": 3,
-      "score": 9,
-      "why_high_signal": [
-        "Existing Tier 2 trust context with an open PR already in the repo",
-        "Repo still clears baseline star/fork checks",
-        "Issue remains open and unassigned"
-      ],
-      "risks": [
-        "Repo push recency is weaker than other candidates",
-        "Current open PR in the repo is CI-blocked",
-        "Bug looks semantically deep rather than a small guaranteed win"
-      ],
-      "recommended_next_step": "Hold as a lower-priority option; prefer follow-up on existing PR or simpler repos before investing here."
+      "priority_tier": 2,
+      "score": 17,
+      "confidence": "medium",
+      "reason": "Best current fallback from the vetted pool if OxiCloud#241 fails admission or preflight. Keep behind OxiCloud due to weaker trust evidence and blocked-CI adjacent context.",
+      "status": "reserve"
     },
     {
-      "repo": "DioCrafts/OxiCloud",
-      "issue_number": 251,
-      "issue_url": "https://github.com/DioCrafts/OxiCloud/issues/251",
-      "title": "[BUG] SSO doesn't enable",
-      "type": "bug",
-      "priority": 4,
-      "score": 6,
-      "why_high_signal": [
-        "Still inside the strongest trust repo",
-        "Issue remains open and unassigned"
-      ],
-      "risks": [
-        "Now appears in failure-log as implement completed without required output",
-        "Issue description is weak and may conceal configuration/support ambiguity",
-        "Should not be retried immediately without new evidence or tighter execution discipline"
-      ],
-      "recommended_next_step": "Do not reselect immediately; only revisit after confirming stronger reproducibility evidence and enforcing a stricter implementation checklist."
+      "repo": "Textualize/rich",
+      "issue": 4056,
+      "url": "https://github.com/Textualize/rich/issues/4056",
+      "type": "typo",
+      "priority_tier": 3,
+      "score": 15,
+      "confidence": "medium",
+      "reason": "Lightweight reserve option with low-diff profile. Good fallback for a small safe contribution, but still weaker than the trust advantage of OxiCloud.",
+      "status": "light_reserve"
     },
     {
-      "repo": "DioCrafts/OxiCloud",
-      "issue_number": 259,
-      "issue_url": "https://github.com/DioCrafts/OxiCloud/issues/259",
-      "title": "[BUG] Failed to create OIDC user: Invalid username",
+      "repo": "pallets/jinja",
+      "issue": 2145,
+      "url": "https://github.com/pallets/jinja/issues/2145",
       "type": "bug",
-      "priority": 5,
-      "score": 5,
-      "why_high_signal": [
-        "Still in the strongest trust repo",
-        "Fresh and unassigned"
-      ],
-      "risks": [
-        "This exact issue has multiple recent gate failures in failure-log",
-        "Repeated retries without new evidence risk wasting cycle budget"
-      ],
-      "recommended_next_step": "Keep deprioritized until fresh evidence explains prior gate failures."
+      "priority_tier": 4,
+      "score": 13,
+      "confidence": "medium",
+      "reason": "Existing open PR context means it should remain reserve-only rather than frontline work. Keep explicit awareness that the ledger references PR #2155 while trust snapshot shows open PR #2154, so numbering must be rechecked before future action.",
+      "status": "occupied_reserve"
+    },
+    {
+      "repo": "RAIT-09/obsidian-agent-client",
+      "issue": 200,
+      "url": "https://github.com/RAIT-09/obsidian-agent-client/issues/200",
+      "type": "bug",
+      "priority_tier": 5,
+      "score": 11,
+      "confidence": "medium",
+      "reason": "Still held as cooldown reserve only. Historical branch-prefix/runtime friction keeps it below the stronger vetted options.",
+      "status": "cooldown_reserve"
     }
+  ],
+  "selection_guidance": {
+    "default_frontline": "DioCrafts/OxiCloud#241",
+    "default_fallback": "MiniZinc/libminizinc#1005",
+    "note": "Do not widen the pool or rerank candidates unless a later run establishes new high-confidence external evidence."
+  },
+  "guardrails": [
+    "consecutive_failures=2 is not evidence that candidate quality improved or degraded; it does not trigger rerank, pool replacement, or gate relaxation.",
+    "No fresh external candidate should be claimed without a successful live query path or other concrete external evidence.",
+    "If implement work starts later, strict admission and preflight are still required before coding.",
+    "If OxiCloud#241 fails admission or preflight, fall back to MiniZinc/libminizinc#1005 rather than opportunistically probing nearby OxiCloud issues."
   ]
 }

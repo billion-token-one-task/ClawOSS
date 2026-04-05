@@ -33,7 +33,7 @@ All work happens in this directory. Never use a shared directory.
 ### 1. Clone and Checkout PR Branch
 ```bash
 # Clone OUR FORK (not upstream) so we have push access
-gh repo clone BillionClaw/{repo} $WORKDIR -- --depth=50
+gh repo clone "${GITHUB_USERNAME}/{repo}" $WORKDIR -- --depth=50
 cd $WORKDIR
 # Add upstream remote for reference
 git remote add upstream https://github.com/{owner}/{repo}.git

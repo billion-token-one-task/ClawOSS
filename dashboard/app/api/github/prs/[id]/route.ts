@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { db, ensureDb } from "@/lib/db";
 import { pullRequests, prReviews, qualityScores } from "@/lib/schema";
+import { DASHBOARD_DEMO_SEED_ENABLED, getDemoPRDetail } from "@/lib/demo-seed";
 import { eq } from "drizzle-orm";
 
 export async function GET(
@@ -13,6 +14,14 @@ export async function GET(
     await ensureDb();
     const { id } = await params;
     const decodedId = decodeURIComponent(id);
+
+    if (DASHBOARD_DEMO_SEED_ENABLED) {
+      const pr = getDemoPRDetail(decodedId);
+      if (!pr) {
+        return NextResponse.json({ error: "PR not found" }, { status: 404 });
+      }
+      return NextResponse.json(pr);
+    }
 
     const pr = await db.query.pullRequests.findFirst({
       where: eq(pullRequests.id, decodedId),
