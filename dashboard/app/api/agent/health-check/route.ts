@@ -4,6 +4,29 @@ import { NextResponse } from "next/server";
 import { db, ensureDb } from "@/lib/db";
 import { pullRequests, prReviews, agentLogs, metricsTokens, settings } from "@/lib/schema";
 import { eq, sql, gte } from "drizzle-orm";
+import { bareModelName } from "@/lib/cost-models";
+
+/** Safe JSON.parse — returns undefined on failure, never throws. */
+function safeParseJson<T = unknown>(raw: string | undefined | null): T | undefined {
+  if (!raw) return undefined;
+  try { return JSON.parse(raw) as T; } catch { return undefined; }
+}
+
+/** Coerce raw budget config into a bare-name-keyed record of positive caps. */
+function normalizeModelBudgets(
+  raw: unknown
+): Record<string, number> {
+  if (!raw || typeof raw !== "object") return {};
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    const cap = typeof v === "number" ? v : Number(v);
+    if (Number.isFinite(cap) && cap > 0) {
+      const bare = bareModelName(k);
+      if (bare) out[bare] = cap;
+    }
+  }
+  return out;
+}
 
 /**
  * Hard blocklist — repos where submitting PRs risks bans or reputation damage.
@@ -63,6 +86,10 @@ export async function GET() {
     let budgetExhausted = false;
     let totalCostUsd = 0;
     let totalBudgetUsd = 0;
+    // Per-model token budgets (bare-name keyed; matches across providers).
+    const modelUsage: Record<string, number> = {};
+    let modelCaps: Record<string, number> = {};
+    const exhaustedModels: { model: string; used: number; cap: number }[] = [];
     try {
       const costResult = await db
         .select({ total: sql<number>`coalesce(sum(${metricsTokens.costUsd}), 0)` })
@@ -73,12 +100,42 @@ export async function GET() {
       const settingsRow = await db.query.settings.findFirst({
         where: eq(settings.key, "dashboard_settings"),
       });
-      const settingsVal = settingsRow?.value as { totalBudgetUsd?: number } | null;
+      const settingsVal = settingsRow?.value as {
+        totalBudgetUsd?: number;
+        modelTokenBudgets?: Record<string, number>;
+      } | null;
       totalBudgetUsd =
         settingsVal?.totalBudgetUsd ??
         parseFloat(process.env.BUDGET_USD_TOTAL || "0");
 
       budgetExhausted = totalBudgetUsd > 0 && totalCostUsd > totalBudgetUsd;
+
+      // Per-model token aggregation — group by bare model name so the same
+      // model served by different providers is merged (e.g. z-ai/glm-4.6
+      // and openrouter/glm-4.6 both accumulate into "glm-4.6").
+      const rawPerModel = await db
+        .select({
+          model: metricsTokens.model,
+          tokens: sql<number>`coalesce(sum(${metricsTokens.inputTokens} + ${metricsTokens.outputTokens}), 0)`,
+        })
+        .from(metricsTokens)
+        .groupBy(metricsTokens.model);
+
+      for (const row of rawPerModel) {
+        const bare = bareModelName(row.model ?? "");
+        if (!bare) continue;
+        modelUsage[bare] = (modelUsage[bare] ?? 0) + Number(row.tokens ?? 0);
+      }
+
+      // Resolve caps: settings table first, env var fallback.
+      modelCaps = normalizeModelBudgets(
+        settingsVal?.modelTokenBudgets ?? safeParseJson(process.env.MODEL_TOKEN_BUDGETS)
+      );
+
+      for (const [bare, cap] of Object.entries(modelCaps)) {
+        const used = modelUsage[bare] ?? 0;
+        if (used >= cap) exhaustedModels.push({ model: bare, used, cap });
+      }
     } catch {
       // non-critical — don't block health check
     }
@@ -198,6 +255,15 @@ export async function GET() {
       );
     }
 
+    for (const m of exhaustedModels) {
+      directives.unshift(
+        `MODEL TOKEN BUDGET EXHAUSTED: ${m.model} used ${m.used.toLocaleString()}/${m.cap.toLocaleString()} tokens. ` +
+        `STOP using this model across ALL providers (matched by bare model name). ` +
+        `Do NOT spawn sub-agents that route to it. ` +
+        `To resume: raise modelTokenBudgets["${m.model}"] in dashboard Settings or MODEL_TOKEN_BUDGETS env var.`
+      );
+    }
+
     if (approvedPRs.length > 0) {
       directives.unshift("MERGE NOW: " + approvedPRs.length + " approved PR(s) ready to merge: " + approvedPRs.map((pr) => pr.repo + "#" + pr.number).join(", ") + ". Run `gh pr merge --squash` if CI passes, or comment asking maintainer to trigger CI.");
     }
@@ -241,6 +307,11 @@ export async function GET() {
         totalBudgetUsd,
         remainingUsd: totalBudgetUsd > 0 ? Math.max(0, totalBudgetUsd - totalCostUsd) : null,
         exhausted: budgetExhausted,
+      },
+      modelBudgets: {
+        exhausted: exhaustedModels,
+        usage: modelUsage,
+        caps: modelCaps,
       },
       stats: {
         total,

@@ -450,3 +450,16 @@ export function computeTokenCost(
 /** @deprecated Use getActiveModel() instead */
 export const DEFAULT_MODEL = getActiveModel();
 export const DEFAULT_COST_MODEL = COST_MODELS[DEFAULT_MODEL] || envFallbackCostModel();
+
+/**
+ * Normalize a model identifier to its bare model name — used for cross-provider
+ * matching so that `z-ai/glm-4.6`, `openrouter/glm-4.6`, and `glm-4.6` all collapse
+ * to the same key. The last path segment wins (handles nested prefixes like
+ * `openrouter/anthropic/claude-opus-4-6`).
+ */
+export function bareModelName(model: string): string {
+  if (!model) return "";
+  const lastSlash = model.lastIndexOf("/");
+  const tail = lastSlash >= 0 ? model.slice(lastSlash + 1) : model;
+  return tail.toLowerCase().trim();
+}

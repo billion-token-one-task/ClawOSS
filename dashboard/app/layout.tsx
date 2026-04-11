@@ -4,6 +4,7 @@ import { ThemeProvider } from "next-themes";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
+import { ModelBudgetBanner } from "@/components/layout/model-budget-banner";
 import "./globals.css";
 
 const spaceMono = Space_Mono({
@@ -48,7 +49,10 @@ export default function RootLayout({
           <TooltipProvider>
             <SidebarProvider>
               <AppSidebar />
-              <main className="flex-1 overflow-auto">{children}</main>
+              <main className="flex-1 overflow-auto">
+                <ModelBudgetBanner />
+                {children}
+              </main>
             </SidebarProvider>
           </TooltipProvider>
         </ThemeProvider>

@@ -71,6 +71,21 @@ Agent 运行（使用正确模型）
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
 | `BUDGET_USD_TOTAL` | 累计总预算（美元），`0` = 不限制 | `0` |
+| `MODEL_TOKEN_BUDGETS` | 每模型 token 上限的 JSON 映射，`0` 或缺省 = 不限制 | `{}` |
+
+`MODEL_TOKEN_BUDGETS` 示例：
+
+```bash
+MODEL_TOKEN_BUDGETS='{"glm-4.6":20000000,"deepseek-chat":50000000,"claude-opus-4-6":10000000}'
+```
+
+**关键语义**：
+
+- **key 是 bare model name**（与供应商前缀无关）。系统按 model name 的最后一段做匹配，全部小写化。`z-ai/glm-4.6`、`openrouter/glm-4.6`、`zhipu/glm-4.6` 都会被合并到同一个 `glm-4.6` 计数器，跨供应商累加。
+- value 是**累计 token 上限**（input + output 之和）。
+- value `0` 或缺省 = 不限制。
+- 触发后行为：health-check 在 directives 顶部插入 `MODEL TOKEN BUDGET EXHAUSTED: <model> ...`，agent 停止派发使用该模型的 sub-agent。Dashboard 顶部出现红色横幅。
+- **不能用 `LLM_BASE_URL` 或 provider 字段判定模型**——同一个模型可能从多个供应商接入，必须用 model name 匹配。
 
 ### Dashboard
 
@@ -463,3 +478,69 @@ To resume: raise totalBudgetUsd in dashboard Settings or increase BUDGET_USD_TOT
 - 熔断基于估算成本，实际账单可能有偏差（见上方计费原理）
 - `totalBudgetUsd = 0` 表示不限制，不会触发熔断
 - `metrics_tokens` 表有 30 天数据保留策略，超期数据会被清理，清理后累计值会重置
+
+---
+
+## 每模型 Token 熔断
+
+与美元总预算并行的另一道闸门：按**模型**配置 token 上限，超限即停止使用该模型。
+
+### 工作原理
+
+健康检查同一接口聚合 `metrics_tokens` 表中每个模型的 `sum(input_tokens + output_tokens)`，按 **bare model name**（model 路径的最后一段，小写）归并跨供应商的用量。任何 model 的累计值 ≥ 配置上限即视为超支：
+
+1. `directives` 顶部追加 `MODEL TOKEN BUDGET EXHAUSTED: <model> used X/Y tokens. STOP using this model across ALL providers ...`
+2. 响应体新增 `modelBudgets` 字段（`exhausted` 数组、`usage` 映射、`caps` 映射）
+3. Dashboard 全局横幅（`ModelBudgetBanner`）轮询 health-check，检测到 `modelBudgets.exhausted` 非空即在所有页面顶部渲染红色提示
+
+### 配置
+
+**方式 A：env var（启动时固定）**
+
+```bash
+MODEL_TOKEN_BUDGETS='{"glm-4.6":20000000,"deepseek-chat":50000000}'
+```
+
+**方式 B：Dashboard Settings（运行时可调）**
+
+通过 `PUT /api/settings` 更新 `modelTokenBudgets` 字段：
+
+```bash
+curl -X PUT http://localhost:3000/api/settings \
+  -H 'Content-Type: application/json' \
+  -d '{"modelTokenBudgets":{"glm-4.6":20000000}}'
+```
+
+API 会自动把 key 归一化为 bare model name（小写、剥前缀）。
+
+优先级：Dashboard settings > `MODEL_TOKEN_BUDGETS` env var > `{}`（不限制）。
+
+### Bare-name 匹配规则
+
+| 写入的 model 字段 | 归一化后 |
+|------------------|---------|
+| `z-ai/glm-4.6` | `glm-4.6` |
+| `openrouter/glm-4.6` | `glm-4.6` |
+| `openrouter/anthropic/claude-opus-4-6` | `claude-opus-4-6` |
+| `GLM-4.6` | `glm-4.6` |
+| `glm-4.6` | `glm-4.6` |
+
+配置 key 同样会经过此归一化，因此用户可以随便写大小写或带不带前缀。
+
+### Health-check 响应格式（新增字段）
+
+```json
+{
+  "modelBudgets": {
+    "exhausted": [
+      { "model": "glm-4.6", "used": 20300000, "cap": 20000000 }
+    ],
+    "usage": { "glm-4.6": 20300000, "claude-opus-4-6": 1200000 },
+    "caps":  { "glm-4.6": 20000000 }
+  }
+}
+```
+
+### 恢复
+
+提高 `modelTokenBudgets["<model>"]` 的值（dashboard settings 或 env var），下一次 health-check 即可撤销 directive，banner 消失，agent 自动恢复使用该模型。

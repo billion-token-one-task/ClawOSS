@@ -126,7 +126,7 @@ export default function OverviewPage() {
             </span>
           </div>
           <div className="flex items-center gap-3 text-muted-foreground/40">
-            <span>kimi-k2.5</span>
+            <span>{process.env.NEXT_PUBLIC_LLM_MODEL_COMPLEX || "kimi-k2.5"}</span>
             <span className="text-muted-foreground/15">|</span>
             <span>parallel-agents</span>
             <span className="text-muted-foreground/15">|</span>
@@ -221,7 +221,7 @@ export default function OverviewPage() {
                 {connectionData.pipeline.errorsLastHour}
               </span></span>
               <span className="text-muted-foreground/10">|</span>
-              <span>model <span className="text-foreground/45">kimi-k2.5</span></span>
+              <span>model <span className="text-foreground/45">{process.env.NEXT_PUBLIC_LLM_MODEL_COMPLEX || "kimi-k2.5"}</span></span>
               <span>cost <span className="text-foreground/45">$0.60/$3.00/M</span></span>
               <span className="text-muted-foreground/10">|</span>
               <span>pii <span className="text-foreground/45">off</span></span>
