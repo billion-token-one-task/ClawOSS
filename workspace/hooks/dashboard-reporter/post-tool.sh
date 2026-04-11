@@ -32,6 +32,7 @@ PAYLOAD=$(jq -n \
   --argjson durationMs "$DURATION" \
   --arg ts "$TIMESTAMP" \
   --arg resultContent "$TOOL_OUTPUT_RAW" \
+  --arg model "${LLM_PROVIDER:-anthropic}/${LLM_MODEL_COMPLEX:-claude-opus-4-6}" \
   '{
     messages: [
       {
@@ -42,7 +43,7 @@ PAYLOAD=$(jq -n \
         toolCallId: $toolCallId,
         durationMs: $durationMs,
         timestamp: $ts,
-        metadata: { agent_id: "clawoss", model: "kimi-coding/k2p5" }
+        metadata: { agent_id: "clawoss", model: $model }
       },
       {
         sessionId: $sid,

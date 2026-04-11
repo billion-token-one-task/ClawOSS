@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { db, ensureDb } from "@/lib/db";
-import { pullRequests, prReviews, agentLogs } from "@/lib/schema";
+import { pullRequests, prReviews, agentLogs, metricsTokens, settings } from "@/lib/schema";
 import { eq, sql, gte } from "drizzle-orm";
 
 /**
@@ -58,6 +58,30 @@ export async function GET() {
     const total = totalResult[0]?.count || 0;
     const merged = mergedResult[0]?.count || 0;
     const open = openResult[0]?.count || 0;
+
+    // Budget check — cumulative spend vs totalBudgetUsd setting
+    let budgetExhausted = false;
+    let totalCostUsd = 0;
+    let totalBudgetUsd = 0;
+    try {
+      const costResult = await db
+        .select({ total: sql<number>`coalesce(sum(${metricsTokens.costUsd}), 0)` })
+        .from(metricsTokens);
+      totalCostUsd = costResult[0]?.total || 0;
+
+      // Budget from settings table (dashboard-editable), fallback to env var
+      const settingsRow = await db.query.settings.findFirst({
+        where: eq(settings.key, "dashboard_settings"),
+      });
+      const settingsVal = settingsRow?.value as { totalBudgetUsd?: number } | null;
+      totalBudgetUsd =
+        settingsVal?.totalBudgetUsd ??
+        parseFloat(process.env.BUDGET_USD_TOTAL || "0");
+
+      budgetExhausted = totalBudgetUsd > 0 && totalCostUsd > totalBudgetUsd;
+    } catch {
+      // non-critical — don't block health check
+    }
 
     // Today's PRs
     const todayResult = await db
@@ -166,6 +190,14 @@ export async function GET() {
     // Quick directives
     const directives: string[] = [];
 
+    if (budgetExhausted) {
+      directives.unshift(
+        `BUDGET EXHAUSTED: Spent $${totalCostUsd.toFixed(2)} of $${totalBudgetUsd.toFixed(2)} total budget. ` +
+        `STOP all new work immediately — do NOT spawn new implementations or submit PRs. ` +
+        `To resume: raise totalBudgetUsd in dashboard Settings or increase BUDGET_USD_TOTAL env var and restart.`
+      );
+    }
+
     if (approvedPRs.length > 0) {
       directives.unshift("MERGE NOW: " + approvedPRs.length + " approved PR(s) ready to merge: " + approvedPRs.map((pr) => pr.repo + "#" + pr.number).join(", ") + ". Run `gh pr merge --squash` if CI passes, or comment asking maintainer to trigger CI.");
     }
@@ -204,6 +236,12 @@ export async function GET() {
 
     return NextResponse.json({
       healthy: directives.length === 0,
+      budget: {
+        totalCostUsd: Math.round(totalCostUsd * 10000) / 10000,
+        totalBudgetUsd,
+        remainingUsd: totalBudgetUsd > 0 ? Math.max(0, totalBudgetUsd - totalCostUsd) : null,
+        exhausted: budgetExhausted,
+      },
       stats: {
         total,
         merged,

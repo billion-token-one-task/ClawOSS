@@ -21,6 +21,9 @@ const DEFAULT_SETTINGS: DashboardSettings = {
     onAgentOffline: true,
   },
   dailyBudgetUsd: 50,
+  totalBudgetUsd: 0, // 0 = unlimited; raise this in dashboard to cap spend
+  modelComplex: process.env.LLM_MODEL_COMPLEX || "claude-opus-4-6",
+  modelSimple: process.env.LLM_MODEL_SIMPLE || "claude-sonnet-4-6",
 };
 
 export async function GET() {

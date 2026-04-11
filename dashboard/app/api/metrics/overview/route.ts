@@ -108,9 +108,16 @@ export async function GET() {
       // Estimate 70/30 input/output split for fallback
       inputTokensToday = Math.round(tokensUsedToday * 0.7);
       outputTokensToday = tokensUsedToday - inputTokensToday;
-      // Estimate cost using Kimi K2.5 average ($1.8/M tokens)
+      // Estimate cost using env-configured pricing (INPUT_COST_PER_M / OUTPUT_COST_PER_M)
       if (tokensUsedToday > 0 && costToday === 0) {
-        costToday = tokensUsedToday * (1.8 / 1_000_000);
+        const inputCostComplex = parseFloat(process.env.INPUT_COST_PER_M_COMPLEX || process.env.INPUT_COST_PER_M || "3.0");
+        const outputCostComplex = parseFloat(process.env.OUTPUT_COST_PER_M_COMPLEX || process.env.OUTPUT_COST_PER_M || "15.0");
+        const inputCostSimple = parseFloat(process.env.INPUT_COST_PER_M_SIMPLE || process.env.INPUT_COST_PER_M || "3.0");
+        const outputCostSimple = parseFloat(process.env.OUTPUT_COST_PER_M_SIMPLE || process.env.OUTPUT_COST_PER_M || "15.0");
+        // Weighted average: ~40% complex (sub-agents) + 60% simple (orchestrator)
+        const avgInputCostPerM = inputCostComplex * 0.4 + inputCostSimple * 0.6;
+        const avgOutputCostPerM = outputCostComplex * 0.4 + outputCostSimple * 0.6;
+        costToday = (inputTokensToday * avgInputCostPerM + outputTokensToday * avgOutputCostPerM) / 1_000_000;
       }
     }
 

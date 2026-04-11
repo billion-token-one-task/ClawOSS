@@ -59,10 +59,11 @@ The quality of ClawOSS output is 100% determined by its prompts. When strategy c
 - Review prompts regularly for cross-file consistency
 
 ## Model
-- MiniMax M2.7 via direct API (`https://api.minimaxi.com/v1`)
-- 204k context window, 131k max output
-- Fallback: Kimi Code k2p5
-- API key env var: `MINIMAX_API_KEY`
+- Configured via env vars: `LLM_PROVIDER` / `LLM_MODEL_COMPLEX` / `LLM_MODEL_SIMPLE`
+- Complex tasks (sub-agents): `LLM_MODEL_COMPLEX` (default: `anthropic/claude-opus-4-6`)
+- Simple tasks (orchestrator/heartbeat): `LLM_MODEL_SIMPLE` (default: `anthropic/claude-sonnet-4-6`)
+- API key: `LLM_API_KEY`; endpoint: `LLM_BASE_URL`
+- See `docs/model-routing.md` for provider examples and budget config
 
 ## Common Commands
 ```bash

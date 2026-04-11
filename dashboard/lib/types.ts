@@ -131,6 +131,12 @@ export interface DashboardSettings {
     onAgentOffline: boolean;
   };
   dailyBudgetUsd: number;
+  /** Cumulative total spend cap in USD. 0 = unlimited. Enforced by health-check. */
+  totalBudgetUsd: number;
+  /** Display-only: complex model in use (set via LLM_MODEL_COMPLEX env var) */
+  modelComplex: string;
+  /** Display-only: simple model in use (set via LLM_MODEL_SIMPLE env var) */
+  modelSimple: string;
 }
 
 export interface ConversationMessage {
