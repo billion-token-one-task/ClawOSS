@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { ModelBudgetBanner } from "@/components/layout/model-budget-banner";
+import { LlmErrorBanner } from "@/components/layout/llm-error-banner";
 import "./globals.css";
 
 const spaceMono = Space_Mono({
@@ -51,6 +52,7 @@ export default function RootLayout({
               <AppSidebar />
               <main className="flex-1 overflow-auto">
                 <ModelBudgetBanner />
+                <LlmErrorBanner />
                 {children}
               </main>
             </SidebarProvider>
