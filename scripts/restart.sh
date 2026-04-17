@@ -65,6 +65,17 @@ if [ ${#MISSING[@]} -gt 0 ]; then
     exit 1
 fi
 echo "[OK] All required tools found (python3, gh, jq, openclaw, node)"
+if clawoss_is_macos; then
+    echo "[INFO] Platform: macOS — will use launchd plists for gateway and pr-ledger-sync"
+else
+    if command -v systemctl >/dev/null 2>&1; then
+        echo "[INFO] Platform: $(uname -s) — will use systemd user units; launchd steps will be skipped"
+    else
+        echo "[WARN] Platform: $(uname -s) — no launchd AND no systemctl detected."
+        echo "       Gateway will fall back to an unmanaged 'openclaw gateway run' background process."
+        echo "       It WILL NOT survive a reboot. Consider running in Docker (see deploy/docker/)."
+    fi
+fi
 if [ "$SMOKE_MODE" -eq 1 ]; then
     echo "[INFO] Restart smoke mode enabled — skipping global cleanup and external side effects where possible"
 fi
@@ -329,8 +340,15 @@ if clawoss_is_macos && [ -f "$GATEWAY_PLIST" ]; then
     else
         echo "[OK] Gateway plist PATH already includes required dirs"
     fi
+elif clawoss_is_macos; then
+    echo "[INFO] macOS detected but no gateway plist at $GATEWAY_PLIST — 'openclaw gateway install' will create it"
 else
-    echo "[INFO] No gateway plist found at $GATEWAY_PLIST — gateway install will create it"
+    # Linux / non-macOS: launchd/PlistBuddy do not exist. OpenClaw manages the
+    # gateway via systemd user units (see step 13). PATH propagation on Linux
+    # is handled by the Environment= directives emitted into the systemd unit
+    # file, so there's nothing to do here — log it so operators can see this
+    # step was intentionally skipped rather than silently broken.
+    echo "[SKIP] Gateway plist path update — not applicable on $(uname -s) (Linux uses systemd, handled in step 13)"
 fi
 
 # ── 7. Flush context & clean sessions ─────────────────────────────────

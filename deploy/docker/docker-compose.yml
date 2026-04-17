@@ -1,0 +1,47 @@
+# ClawOSS agent — Linux Docker Compose deployment.
+#
+# This is additive to the root-level docker-compose.yml (which runs the
+# autonomy backend API + worker + reflection services). This file runs the
+# actual OpenClaw agent container for Phase-1 demo deployments on Linux hosts.
+#
+# Usage:
+#   cp .env.example .env && $EDITOR .env
+#   docker compose -f deploy/docker/docker-compose.yml up --build
+#
+# Stop and preserve state:
+#   docker compose -f deploy/docker/docker-compose.yml down
+#
+# Full reset (blows away openclaw state — required after config changes):
+#   docker compose -f deploy/docker/docker-compose.yml down -v
+#
+# The single-service design matches the macOS launchd flow: one long-lived
+# process (`openclaw gateway run`) supervises its own heartbeat + subagents.
+
+services:
+  agent:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    image: clawoss-agent:local
+    restart: unless-stopped
+    env_file:
+      - ../../.env
+    volumes:
+      # Persist openclaw state (agent registry, session jsonl, extensions).
+      # Without this, every restart drops queued work and pending subagents.
+      - clawoss_state:/home/clawoss/.openclaw
+      # Expose workspace memory so operators can tail state files on the host.
+      - ../../workspace/memory:/app/workspace/memory
+    # Gateway default port; expose only on localhost so an open .env doesn't
+    # turn into an open LLM proxy.
+    ports:
+      - "127.0.0.1:18789:18789"
+    healthcheck:
+      test: ["CMD", "sh", "-c", "openclaw gateway status 2>/dev/null | grep -qi 'running\\|reachable\\|ok'"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  clawoss_state:

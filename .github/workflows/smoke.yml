@@ -1,0 +1,87 @@
+name: Smoke
+
+# Minimal pre-merge gate for Phase-1 demo deployment. Runs on every PR to
+# main or alpha/**. Kept intentionally small — if this goes red, the PR
+# shouldn't merge. Heavier tests live in validate.yml.
+
+on:
+  pull_request:
+    branches: [main, "alpha/**"]
+  push:
+    branches: [main, "alpha/**"]
+
+jobs:
+  bash-scripts:
+    name: Bash script syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Syntax-check every shell script
+        run: |
+          set -e
+          fail=0
+          while IFS= read -r -d '' f; do
+            if ! bash -n "$f"; then
+              echo "::error file=$f::bash -n failed"
+              fail=1
+            fi
+          done < <(find scripts deploy -type f -name '*.sh' -print0)
+          exit "$fail"
+
+  env-example-parses:
+    name: .env.example is a valid env file
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Source .env.example
+        run: |
+          # .env.example ships provider snippets commented out — sourcing it
+          # should succeed and should set the required LLM_* vars. This catches
+          # accidental stray "$(...)" expansions or unbalanced quotes before
+          # they reach a user's .env.
+          set -a
+          # shellcheck disable=SC1091
+          . ./.env.example
+          set +a
+          for v in LLM_PROVIDER LLM_BASE_URL LLM_MODEL_COMPLEX LLM_MODEL_SIMPLE; do
+            if [ -z "${!v:-}" ]; then
+              echo "::error::.env.example did not set $v"
+              exit 1
+            fi
+          done
+          echo "LLM_PROVIDER=$LLM_PROVIDER LLM_MODEL_COMPLEX=$LLM_MODEL_COMPLEX LLM_MODEL_SIMPLE=$LLM_MODEL_SIMPLE"
+
+  openclaw-json-substitutes:
+    name: openclaw.json template substitution
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run validate-config.mjs
+        run: node scripts/validate-config.mjs || (echo "::error::validate-config.mjs failed" && exit 1)
+
+  docker-build:
+    name: Agent Docker image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build agent image (no push)
+        # The image pulls openclaw from npm and a few apt packages. We only
+        # care that the build graph succeeds — we do not run the container
+        # (that requires real LLM / GitHub credentials).
+        run: |
+          docker build \
+            -f deploy/docker/Dockerfile \
+            -t clawoss-agent:ci \
+            .
+
+      - name: Docker compose config lint
+        run: |
+          docker compose -f deploy/docker/docker-compose.yml config > /dev/null

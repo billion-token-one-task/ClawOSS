@@ -41,8 +41,28 @@ console.log("\n=== Config Files ===");
 
 try {
   const raw = readFileSync(join(ROOT, "config/openclaw.json"), "utf8");
-  JSON.parse(raw);
-  pass("config/openclaw.json is valid JSON");
+  // openclaw.json contains __PLACEHOLDER__ tokens that scripts/restart.sh +
+  // deploy/docker/entrypoint.sh substitute at deploy time. Validate the
+  // post-substitution shape here so CI catches malformed templates without
+  // requiring operators to run the full deploy flow.
+  const substituted = raw
+    .replace(/__WORKSPACE_PATH__/g, "/app/workspace")
+    .replace(/__PROJECT_DIR__/g, "/app")
+    .replace(/__HOME_DIR__/g, "/home/clawoss")
+    .replace(/__LLM_PROVIDER__/g, "anthropic")
+    .replace(/__LLM_BASE_URL__/g, "https://api.anthropic.com/v1")
+    .replace(/__LLM_MODEL_COMPLEX__/g, "claude-opus-4-6")
+    .replace(/__LLM_MODEL_SIMPLE__/g, "claude-sonnet-4-6")
+    .replace(/__INPUT_COST_PER_M_COMPLEX__/g, "5.0")
+    .replace(/__OUTPUT_COST_PER_M_COMPLEX__/g, "25.0")
+    .replace(/__INPUT_COST_PER_M_SIMPLE__/g, "3.0")
+    .replace(/__OUTPUT_COST_PER_M_SIMPLE__/g, "15.0")
+    .replace(/__INPUT_COST_PER_M__/g, "3.0")
+    .replace(/__OUTPUT_COST_PER_M__/g, "15.0")
+    .replace(/__LLM_CONTEXT_WINDOW__/g, "200000")
+    .replace(/__LLM_MAX_TOKENS__/g, "32000");
+  JSON.parse(substituted);
+  pass("config/openclaw.json is valid JSON (post-template-substitution)");
 } catch (e) {
   fail(`config/openclaw.json: ${e.message}`);
 }
