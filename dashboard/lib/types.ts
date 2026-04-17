@@ -131,6 +131,18 @@ export interface DashboardSettings {
     onAgentOffline: boolean;
   };
   dailyBudgetUsd: number;
+  /** Cumulative total spend cap in USD. 0 = unlimited. Enforced by health-check. */
+  totalBudgetUsd: number;
+  /**
+   * Per-model cumulative token caps. Keyed by bare model name (e.g. "glm-4.6",
+   * "deepseek-chat"), matched across all providers. Value is total tokens
+   * (input + output). Missing or ≤ 0 = unlimited. Enforced by health-check.
+   */
+  modelTokenBudgets: Record<string, number>;
+  /** Display-only: complex model in use (set via LLM_MODEL_COMPLEX env var) */
+  modelComplex: string;
+  /** Display-only: simple model in use (set via LLM_MODEL_SIMPLE env var) */
+  modelSimple: string;
 }
 
 export interface ConversationMessage {

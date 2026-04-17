@@ -75,6 +75,41 @@ export async function GET() {
       ? lastMetric[0].timestamp.getTime() > oneHourAgo.getTime()
       : false;
 
+    // LLM health — probes the openclaw session jsonl directly so we can
+    // surface "agent alive but LLM is 4xx/5xx" even when no heartbeat has
+    // been ingested yet (the hook only fires on agent_end, which never
+    // happens if the very first LLM call fails).
+    let llm: {
+      state: "ok" | "errored" | "unknown";
+      message: string;
+      lastError: string | null;
+      lastErrorAt: string | null;
+      lastSuccessAt: string | null;
+    } = {
+      state: "unknown",
+      message: "LLM health probe unavailable",
+      lastError: null,
+      lastErrorAt: null,
+      lastSuccessAt: null,
+    };
+    try {
+      const origin = process.env.NEXT_PUBLIC_DASHBOARD_URL ||
+        `http://127.0.0.1:${process.env.PORT || 3000}`;
+      const res = await fetch(`${origin}/api/agent/llm-health`, { cache: "no-store" });
+      if (res.ok) {
+        const body = await res.json();
+        llm = {
+          state: body.state,
+          message: body.message,
+          lastError: body.lastError ?? null,
+          lastErrorAt: body.lastErrorAt ?? null,
+          lastSuccessAt: body.lastSuccessAt ?? null,
+        };
+      }
+    } catch {
+      // non-critical
+    }
+
     const response = {
       connection: {
         state: connectionState,
@@ -89,6 +124,7 @@ export async function GET() {
         errorsLastHour: recentErrors[0]?.count || 0,
         lastMetricAt: lastMetric[0]?.timestamp || null,
       },
+      llm,
       hasAnyData: hasHeartbeats || hasMetrics,
       runtime,
     };

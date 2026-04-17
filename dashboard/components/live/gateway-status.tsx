@@ -100,7 +100,7 @@ export function GatewayStatus({
         </div>
         <div className="flex justify-between">
           <span className="stat-label">Model</span>
-          <span className="text-foreground/60">minimax/MiniMax-M2.7</span>
+          <span className="text-foreground/60">{process.env.NEXT_PUBLIC_LLM_PROVIDER || "anthropic"}/{process.env.NEXT_PUBLIC_LLM_MODEL_COMPLEX || "claude-opus-4-6"}</span>
         </div>
         <div className="flex justify-between">
           <span className="stat-label">Auth</span>

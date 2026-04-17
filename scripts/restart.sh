@@ -138,6 +138,18 @@ REPO_CONFIG_RESOLVED=$(sed \
     -e "s|__WORKSPACE_PATH__|$WORKSPACE_DIR|g" \
     -e "s|__PROJECT_DIR__|$PROJECT_DIR|g" \
     -e "s|__HOME_DIR__|$HOME|g" \
+    -e "s|__LLM_PROVIDER__|${LLM_PROVIDER:-anthropic}|g" \
+    -e "s|__LLM_BASE_URL__|${LLM_BASE_URL:-https://api.anthropic.com/v1}|g" \
+    -e "s|__LLM_MODEL_COMPLEX__|${LLM_MODEL_COMPLEX:-claude-opus-4-6}|g" \
+    -e "s|__LLM_MODEL_SIMPLE__|${LLM_MODEL_SIMPLE:-claude-sonnet-4-6}|g" \
+    -e "s|__INPUT_COST_PER_M_COMPLEX__|${INPUT_COST_PER_M_COMPLEX:-${INPUT_COST_PER_M:-3.0}}|g" \
+    -e "s|__OUTPUT_COST_PER_M_COMPLEX__|${OUTPUT_COST_PER_M_COMPLEX:-${OUTPUT_COST_PER_M:-15.0}}|g" \
+    -e "s|__INPUT_COST_PER_M_SIMPLE__|${INPUT_COST_PER_M_SIMPLE:-${INPUT_COST_PER_M:-3.0}}|g" \
+    -e "s|__OUTPUT_COST_PER_M_SIMPLE__|${OUTPUT_COST_PER_M_SIMPLE:-${OUTPUT_COST_PER_M:-15.0}}|g" \
+    -e "s|__INPUT_COST_PER_M__|${INPUT_COST_PER_M:-3.0}|g" \
+    -e "s|__OUTPUT_COST_PER_M__|${OUTPUT_COST_PER_M:-15.0}|g" \
+    -e "s|__LLM_CONTEXT_WINDOW__|${LLM_CONTEXT_WINDOW:-200000}|g" \
+    -e "s|__LLM_MAX_TOKENS__|${LLM_MAX_TOKENS:-32000}|g" \
     "$PROJECT_DIR/config/openclaw.json")
 
 _REPO_CONFIG="$REPO_CONFIG_RESOLVED" \
@@ -157,6 +169,19 @@ _CLAW_KEY="${CLAW_API_KEY:-}" \
 _CLAWOSS_ROOT="${PROJECT_DIR}" \
 _RECORD_DECISIONS="${CLAWOSS_RECORD_DECISIONS:-1}" \
 _RECORD_OUTCOMES="${CLAWOSS_RECORD_OUTCOMES:-1}" \
+_LLM_KEY="${LLM_API_KEY:-}" \
+_LLM_BASE_URL="${LLM_BASE_URL:-}" \
+_LLM_PROVIDER="${LLM_PROVIDER:-}" \
+_LLM_MODEL_COMPLEX="${LLM_MODEL_COMPLEX:-}" \
+_LLM_MODEL_SIMPLE="${LLM_MODEL_SIMPLE:-}" \
+_INPUT_COST_PER_M="${INPUT_COST_PER_M:-}" \
+_OUTPUT_COST_PER_M="${OUTPUT_COST_PER_M:-}" \
+_INPUT_COST_PER_M_COMPLEX="${INPUT_COST_PER_M_COMPLEX:-}" \
+_OUTPUT_COST_PER_M_COMPLEX="${OUTPUT_COST_PER_M_COMPLEX:-}" \
+_INPUT_COST_PER_M_SIMPLE="${INPUT_COST_PER_M_SIMPLE:-}" \
+_OUTPUT_COST_PER_M_SIMPLE="${OUTPUT_COST_PER_M_SIMPLE:-}" \
+_BUDGET_USD_TOTAL="${BUDGET_USD_TOTAL:-}" \
+_MODEL_TOKEN_BUDGETS="${MODEL_TOKEN_BUDGETS:-}" \
 python3 -c "
 import json, os
 
@@ -198,6 +223,20 @@ env_map = {
     'CLAWOSS_ROOT': os.environ.get('_CLAWOSS_ROOT', ''),
     'CLAWOSS_RECORD_DECISIONS': os.environ.get('_RECORD_DECISIONS', ''),
     'CLAWOSS_RECORD_OUTCOMES': os.environ.get('_RECORD_OUTCOMES', ''),
+    # Generic LLM config — used by model routing system
+    'LLM_API_KEY': os.environ.get('_LLM_KEY', ''),
+    'LLM_BASE_URL': os.environ.get('_LLM_BASE_URL', ''),
+    'LLM_PROVIDER': os.environ.get('_LLM_PROVIDER', ''),
+    'LLM_MODEL_COMPLEX': os.environ.get('_LLM_MODEL_COMPLEX', ''),
+    'LLM_MODEL_SIMPLE': os.environ.get('_LLM_MODEL_SIMPLE', ''),
+    'INPUT_COST_PER_M': os.environ.get('_INPUT_COST_PER_M', ''),
+    'OUTPUT_COST_PER_M': os.environ.get('_OUTPUT_COST_PER_M', ''),
+    'INPUT_COST_PER_M_COMPLEX': os.environ.get('_INPUT_COST_PER_M_COMPLEX', ''),
+    'OUTPUT_COST_PER_M_COMPLEX': os.environ.get('_OUTPUT_COST_PER_M_COMPLEX', ''),
+    'INPUT_COST_PER_M_SIMPLE': os.environ.get('_INPUT_COST_PER_M_SIMPLE', ''),
+    'OUTPUT_COST_PER_M_SIMPLE': os.environ.get('_OUTPUT_COST_PER_M_SIMPLE', ''),
+    'BUDGET_USD_TOTAL': os.environ.get('_BUDGET_USD_TOTAL', ''),
+    'MODEL_TOKEN_BUDGETS': os.environ.get('_MODEL_TOKEN_BUDGETS', ''),
 }
 for k, v in env_map.items():
     if v:
@@ -572,7 +611,7 @@ runtime_status "running" "running" "${DASHBOARD_SYNC_STATE:-unknown}" "${RUN_CYC
 # ── Summary ───────────────────────────────────────────────────────────
 echo ""
 echo "=== ClawOSS V10 Running ==="
-echo "  Model: minimax/m2.7 (MiniMax M2.7, 204k context) + kimi-coding/k2p5 fallback"
+echo "  Model: ${LLM_PROVIDER:-anthropic}/${LLM_MODEL_COMPLEX:-claude-opus-4-6} (complex) + ${LLM_PROVIDER:-anthropic}/${LLM_MODEL_SIMPLE:-claude-sonnet-4-6} (simple/orchestrator)"
 echo "  Dashboard: https://clawoss-dashboard.vercel.app"
 echo "  Slots: 3 always-on (scout + PR monitor + PR analyst) + 10 impl/followup = 13"
 echo "  Heartbeat: 5m"

@@ -126,7 +126,7 @@ export default function OverviewPage() {
             </span>
           </div>
           <div className="flex items-center gap-3 text-muted-foreground/40">
-            <span>billionclaw-demo</span>
+            <span>{process.env.NEXT_PUBLIC_LLM_MODEL_COMPLEX || "billionclaw-demo"}</span>
             <span className="text-muted-foreground/15">|</span>
             <span>parallel-agents</span>
             <span className="text-muted-foreground/15">|</span>
@@ -221,7 +221,9 @@ export default function OverviewPage() {
                 {connectionData.pipeline.errorsLastHour}
               </span></span>
               <span className="text-muted-foreground/10">|</span>
-              <span>source <span className="text-foreground/45">github/BillionClaw</span></span>
+              <span>source <span className="text-foreground/45">github/{process.env.GITHUB_USERNAME || "BillionClaw"}</span></span>
+              <span className="text-muted-foreground/10">|</span>
+              <span>model <span className="text-foreground/45">{process.env.NEXT_PUBLIC_LLM_MODEL_COMPLEX || "claude-opus-4-6"}</span></span>
               <span>cost <span className="text-foreground/45">$0.60/$3.00/M</span></span>
               <span className="text-muted-foreground/10">|</span>
               <span>pii <span className="text-foreground/45">off</span></span>

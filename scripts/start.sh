@@ -10,7 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(clawoss_resolve_project_dir "$0")"
 AGENT_ID="clawoss"
 WORKSPACE_DIR="$(clawoss_resolve_workspace_dir "$0")"
-AGENT_MODEL="${CLAWOSS_MODEL:-${CLAWOSS_AGENT_MODEL:-${CLAWOSS_PRIMARY_MODEL:-${CLAWOSS_DEFAULT_MODEL:-minimax/MiniMax-M2.7}}}}"
+AGENT_MODEL="${CLAWOSS_MODEL:-${CLAWOSS_AGENT_MODEL:-${CLAWOSS_PRIMARY_MODEL:-${CLAWOSS_DEFAULT_MODEL:-${LLM_PROVIDER:-anthropic}/${LLM_MODEL_SIMPLE:-claude-sonnet-4-6}}}}}"
 
 if [ -f "$PROJECT_DIR/.env" ]; then
     set -a

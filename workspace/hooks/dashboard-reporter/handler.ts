@@ -1,15 +1,44 @@
 const DASHBOARD_URL = process.env.DASHBOARD_URL || "https://clawoss-dashboard.vercel.app";
 const AGENT_ID = "clawoss";
-const GITHUB_USERNAME = process.env.GITHUB_USERNAME || "unknown";
-const DEFAULT_MODEL =
-  process.env.CLAWOSS_PRIMARY_MODEL ||
-  process.env.CLAWOSS_DEFAULT_MODEL ||
-  "minimax/MiniMax-M2.7";
-const INPUT_COST_PER_TOKEN = 0.3 / 1_000_000;
-const OUTPUT_COST_PER_TOKEN = 1.2 / 1_000_000;
+const GITHUB_USERNAME = process.env.GITHUB_USERNAME || "BillionClaw";
 
-let accumulatedInputTokens = 0;
-let accumulatedOutputTokens = 0;
+// Model routing — driven by env vars. See docs/model-routing.md.
+const LLM_PROVIDER = process.env.LLM_PROVIDER || "anthropic";
+const LLM_MODEL_COMPLEX = process.env.LLM_MODEL_COMPLEX || "claude-opus-4-6";
+const LLM_MODEL_SIMPLE  = process.env.LLM_MODEL_SIMPLE  || "claude-sonnet-4-6";
+
+const MODEL_COMPLEX = `${LLM_PROVIDER}/${LLM_MODEL_COMPLEX}`;
+const MODEL_SIMPLE  = `${LLM_PROVIDER}/${LLM_MODEL_SIMPLE}`;
+
+// Per-model pricing (USD per million tokens).
+// Complex and simple models can have different prices.
+// Falls back to INPUT_COST_PER_M / OUTPUT_COST_PER_M if per-model vars not set.
+const FALLBACK_IN  = process.env.INPUT_COST_PER_M  || "3.0";
+const FALLBACK_OUT = process.env.OUTPUT_COST_PER_M || "15.0";
+
+const PRICING = {
+  complex: {
+    input:  parseFloat(process.env.INPUT_COST_PER_M_COMPLEX  || FALLBACK_IN)  / 1_000_000,
+    output: parseFloat(process.env.OUTPUT_COST_PER_M_COMPLEX || FALLBACK_OUT) / 1_000_000,
+  },
+  simple: {
+    input:  parseFloat(process.env.INPUT_COST_PER_M_SIMPLE  || FALLBACK_IN)  / 1_000_000,
+    output: parseFloat(process.env.OUTPUT_COST_PER_M_SIMPLE || FALLBACK_OUT) / 1_000_000,
+  },
+};
+
+// Determine model tier from session key:
+// main session → orchestrator → simple model
+// anything else → sub-agent → complex model
+function modelTierForSession(sessionId: string): "complex" | "simple" {
+  return sessionId === "main" ? "simple" : "complex";
+}
+
+// Per-tier token accumulators — flushed to dashboard on agent_end
+const accumulated = {
+  complex: { inputTokens: 0, outputTokens: 0 },
+  simple:  { inputTokens: 0, outputTokens: 0 },
+};
 let accumulatedDurationMs = 0;
 let toolCallCount = 0;
 let startTime = Date.now();
@@ -171,7 +200,7 @@ async function postState(apiKey: string): Promise<void> {
         metadata: {
           agent_id: AGENT_ID,
           tool_calls: toolCallCount,
-          model: DEFAULT_MODEL,
+          model: MODEL_SIMPLE,  // postState reflects orchestrator (main session)
         },
       }),
       signal: controller.signal,
@@ -249,8 +278,9 @@ const handler = async (event: {
       const params = event.params || {};
       if (typeof params === "object") {
         const paramStr = JSON.stringify(params);
-        accumulatedInputTokens += Math.ceil(paramStr.length / 4);
-        accumulatedOutputTokens += Math.ceil(paramStr.length / 8);
+        const tier = modelTierForSession(sessionId);
+        accumulated[tier].inputTokens  += Math.ceil(paramStr.length / 4);
+        accumulated[tier].outputTokens += Math.ceil(paramStr.length / 8);
       }
 
       // Track repos from tool params
@@ -488,7 +518,7 @@ const handler = async (event: {
           role: "assistant",
           content: event.assistantMessage.slice(0, 5000),
           timestamp: ts,
-          tokenCount: accumulatedOutputTokens || null,
+          tokenCount: accumulated[modelTierForSession(sessionId)].outputTokens || null,
           metadata: {
             agent_id: AGENT_ID,
             event: "agent_end",
@@ -518,7 +548,7 @@ const handler = async (event: {
         role: "system",
         content: event.error
           ? `Run ended with error: ${event.error} (${toolCallCount} tool calls, ${uptimeSeconds}s)`
-          : `Run completed: ${toolCallCount} tool calls, ${uptimeSeconds}s, ~${accumulatedInputTokens + accumulatedOutputTokens} tokens`,
+          : `Run completed: ${toolCallCount} tool calls, ${uptimeSeconds}s, ~${accumulated.complex.inputTokens + accumulated.complex.outputTokens + accumulated.simple.inputTokens + accumulated.simple.outputTokens} tokens`,
         timestamp: ts,
         metadata: {
           agent_id: AGENT_ID,
@@ -550,7 +580,7 @@ const handler = async (event: {
           metadata: {
             session_key: sessionId,
             tool_calls: toolCallCount,
-            model: DEFAULT_MODEL,
+            model: modelTierForSession(sessionId) === "simple" ? MODEL_SIMPLE : MODEL_COMPLEX,
             repos: Array.from(reposUsed),
             skill: lastSkillName,
           },
@@ -558,37 +588,37 @@ const handler = async (event: {
         apiKey
       );
 
-      // Send accumulated metrics if any
-      if (accumulatedInputTokens > 0 || accumulatedOutputTokens > 0) {
-        const costUsd =
-          accumulatedInputTokens * INPUT_COST_PER_TOKEN +
-          accumulatedOutputTokens * OUTPUT_COST_PER_TOKEN;
+      // Send accumulated metrics — one entry per model tier that has usage
+      const metricsEntries: Record<string, unknown>[] = [];
+      const tiers = (["complex", "simple"] as const).filter(
+        (t) => accumulated[t].inputTokens > 0 || accumulated[t].outputTokens > 0
+      );
 
-        await postNonBlocking(
-          "/api/ingest/metrics",
-          {
-            metrics: [
-              {
-                channel: "agent",
-                provider: "minimax",
-                model: DEFAULT_MODEL,
-                inputTokens: accumulatedInputTokens,
-                outputTokens: accumulatedOutputTokens,
-                costUsd: Math.round(costUsd * 1_000_000) / 1_000_000,
-                runDurationMs: accumulatedDurationMs,
-                contextTokens: accumulatedInputTokens,
-              },
-            ],
-          },
-          apiKey
-        );
-
-        // Reset accumulators
-        accumulatedInputTokens = 0;
-        accumulatedOutputTokens = 0;
-        accumulatedDurationMs = 0;
-        toolCallCount = 0;
+      for (const tier of tiers) {
+        const { inputTokens, outputTokens } = accumulated[tier];
+        const pricing = PRICING[tier];
+        const costUsd = inputTokens * pricing.input + outputTokens * pricing.output;
+        metricsEntries.push({
+          channel: tier === "complex" ? "subagent" : "orchestrator",
+          provider: `${LLM_PROVIDER}-direct`,
+          model: tier === "complex" ? MODEL_COMPLEX : MODEL_SIMPLE,
+          inputTokens,
+          outputTokens,
+          costUsd: Math.round(costUsd * 1_000_000) / 1_000_000,
+          runDurationMs: tier === "complex" ? accumulatedDurationMs : 0,
+          contextTokens: inputTokens,
+        });
+        accumulated[tier].inputTokens = 0;
+        accumulated[tier].outputTokens = 0;
       }
+
+      if (metricsEntries.length > 0) {
+        await postNonBlocking("/api/ingest/metrics", { metrics: metricsEntries }, apiKey);
+      }
+
+      // Reset shared accumulators
+      accumulatedDurationMs = 0;
+      toolCallCount = 0;
 
       // Log agent completion with enriched metadata
       await postNonBlocking(

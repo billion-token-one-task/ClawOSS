@@ -6,7 +6,7 @@
 DASHBOARD_URL="${DASHBOARD_URL:-https://clawoss-dashboard.vercel.app}"
 API_KEY="${CLAW_API_KEY:?Set CLAW_API_KEY env var}"
 SESSION_ID="${CLAUDE_SESSION_ID:-agent-session}"
-DEFAULT_MODEL="${CLAWOSS_PRIMARY_MODEL:-${CLAWOSS_DEFAULT_MODEL:-minimax/MiniMax-M2.7}}"
+DEFAULT_MODEL="${CLAWOSS_PRIMARY_MODEL:-${CLAWOSS_DEFAULT_MODEL:-${LLM_PROVIDER:-anthropic}/${LLM_MODEL_COMPLEX:-claude-opus-4-6}}}"
 
 # Read the hook input from stdin
 INPUT=$(cat 2>/dev/null || echo '{}')
@@ -33,7 +33,7 @@ PAYLOAD=$(jq -n \
   --argjson durationMs "$DURATION" \
   --arg ts "$TIMESTAMP" \
   --arg resultContent "$TOOL_OUTPUT_RAW" \
-  --arg defaultModel "$DEFAULT_MODEL" \
+  --arg model "$DEFAULT_MODEL" \
   '{
     messages: [
       {
@@ -44,7 +44,7 @@ PAYLOAD=$(jq -n \
         toolCallId: $toolCallId,
         durationMs: $durationMs,
         timestamp: $ts,
-        metadata: { agent_id: "clawoss", model: $defaultModel }
+        metadata: { agent_id: "clawoss", model: $model }
       },
       {
         sessionId: $sid,
