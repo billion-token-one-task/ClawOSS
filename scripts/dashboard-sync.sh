@@ -94,6 +94,42 @@ log "Session map built: $(_SESSION_MAP="$SESSION_MAP" python3 -c "import json, o
 CYCLE=0
 
 while true; do
+
+  # --- Budget guard ---
+  if [ -n "${TOKEN_BUDGET_USD:-}" ] && [ "${TOKEN_BUDGET_USD}" != "0" ]; then
+    TOTAL_COST=$(curl -s -m 5 \
+      -H "Authorization: Bearer $KEY" \
+      "$URL/api/metrics/overview" 2>/dev/null | \
+      python3 -c "
+import json,sys
+try:
+    d=json.load(sys.stdin)
+    print(d.get('stats',{}).get('totalCostAllTime',0))
+except:
+    print(0)
+" 2>/dev/null || echo "0")
+
+    OVER_BUDGET=$(python3 -c "
+try:
+    over = float('$TOTAL_COST') >= float('$TOKEN_BUDGET_USD')
+    print('yes' if over else 'no')
+except:
+    print('no')
+" 2>/dev/null || echo "no")
+
+    if [ "$OVER_BUDGET" = "yes" ]; then
+      log "BUDGET EXCEEDED: spent=\$$TOTAL_COST budget=\$$TOKEN_BUDGET_USD — stopping gateway"
+      curl -s -m 5 -X POST "$URL/api/ingest/heartbeat" \
+        -H "Authorization: Bearer $KEY" \
+        -H "Content-Type: application/json" \
+        -d "{\"status\":\"offline\",\"currentTask\":\"BUDGET EXCEEDED: spent \$$TOTAL_COST of \$$TOKEN_BUDGET_USD\"}" \
+        >/dev/null 2>&1
+      openclaw gateway stop 2>/dev/null || true
+      sleep "${BUDGET_CHECK_INTERVAL:-60}"
+      continue
+    fi
+  fi
+
   CYCLE=$((CYCLE + 1))
 
   # --- Self-update check every 6 cycles (60 seconds) ---

@@ -206,6 +206,14 @@ export async function GET() {
     const totalTokensAllTime = (totalTokensResult[0]?.input || 0) + (totalTokensResult[0]?.output || 0);
     const tokensPerMerge = mergedPRs > 0 ? Math.round(totalTokensAllTime / mergedPRs) : 0;
 
+    const budgetUsd = process.env.TOKEN_BUDGET_USD
+      ? parseFloat(process.env.TOKEN_BUDGET_USD)
+      : null;
+    const budgetUsedPercent =
+      budgetUsd && budgetUsd > 0
+        ? Math.round((totalCostAllTime / budgetUsd) * 100)
+        : null;
+
     return NextResponse.json({
       agentStatus: {
         isOnline,
@@ -229,6 +237,8 @@ export async function GET() {
         costPerMerge,
         tokensPerMerge,
         avgHoursToReview,
+        budgetUsd,
+        budgetUsedPercent,
       },
       funnel: {
         submitted: totalPRs,
