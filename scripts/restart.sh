@@ -174,56 +174,48 @@ print('All cron jobs disabled (V10: no cron dependencies)')
     echo "[OK] Cron jobs disabled (V10: heartbeat + subagents handle everything)"
 fi
 
-# ── 6. Update gateway plist PATH (ensure python3, gh, jq are reachable) ─
-# The gateway spawns subagents that need these tools. launchd has a minimal
-# PATH so we inject the paths we need.
-if [ -f "$GATEWAY_PLIST" ]; then
-    # Get current PATH from plist
-    PLIST_PATH=$(/usr/libexec/PlistBuddy -c "Print :EnvironmentVariables:PATH" "$GATEWAY_PLIST" 2>/dev/null || echo "")
-    NEEDS_UPDATE=false
-
-    # Directories that must be in the plist PATH
-    REQUIRED_DIRS=()
-    for dir in "/opt/homebrew/bin" "/usr/local/bin" "/usr/bin" "/bin" "/usr/sbin" "/sbin"; do
-        if [ -d "$dir" ] && [[ ":$PLIST_PATH:" != *":$dir:"* ]]; then
-            REQUIRED_DIRS+=("$dir")
+# ── 6. Update gateway plist PATH (macOS only) ────────────────────────
+if [[ "$(uname)" == "Darwin" ]]; then
+    if [ -f "$GATEWAY_PLIST" ]; then
+        PLIST_PATH=$(/usr/libexec/PlistBuddy -c "Print :EnvironmentVariables:PATH" "$GATEWAY_PLIST" 2>/dev/null || echo "")
+        NEEDS_UPDATE=false
+        REQUIRED_DIRS=()
+        for dir in "/opt/homebrew/bin" "/usr/local/bin" "/usr/bin" "/bin" "/usr/sbin" "/sbin"; do
+            if [ -d "$dir" ] && [[ ":$PLIST_PATH:" != *":$dir:"* ]]; then
+                REQUIRED_DIRS+=("$dir")
+                NEEDS_UPDATE=true
+            fi
+        done
+        NVM_NODE_DIR="$(dirname "$(which node)" 2>/dev/null || echo "")"
+        if [ -n "$NVM_NODE_DIR" ] && [[ ":$PLIST_PATH:" != *":$NVM_NODE_DIR:"* ]]; then
+            REQUIRED_DIRS+=("$NVM_NODE_DIR")
             NEEDS_UPDATE=true
         fi
-    done
-
-    # Also add nvm node path if present
-    NVM_NODE_DIR="$(dirname "$(which node)" 2>/dev/null || echo "")"
-    if [ -n "$NVM_NODE_DIR" ] && [[ ":$PLIST_PATH:" != *":$NVM_NODE_DIR:"* ]]; then
-        REQUIRED_DIRS+=("$NVM_NODE_DIR")
-        NEEDS_UPDATE=true
-    fi
-
-    # Add gh path if not already included
-    GH_DIR="$(dirname "$(which gh)" 2>/dev/null || echo "")"
-    if [ -n "$GH_DIR" ] && [[ ":$PLIST_PATH:" != *":$GH_DIR:"* ]]; then
-        REQUIRED_DIRS+=("$GH_DIR")
-        NEEDS_UPDATE=true
-    fi
-
-    # Add ~/.local/bin (python -> python3 symlink lives here)
-    LOCAL_BIN="$HOME/.local/bin"
-    if [ -d "$LOCAL_BIN" ] && [[ ":$PLIST_PATH:" != *":$LOCAL_BIN:"* ]]; then
-        REQUIRED_DIRS+=("$LOCAL_BIN")
-        NEEDS_UPDATE=true
-    fi
-
-    if [ "$NEEDS_UPDATE" = true ] && [ -n "$PLIST_PATH" ]; then
-        NEW_PATH="$PLIST_PATH"
-        for dir in "${REQUIRED_DIRS[@]}"; do
-            NEW_PATH="$NEW_PATH:$dir"
-        done
-        /usr/libexec/PlistBuddy -c "Set :EnvironmentVariables:PATH $NEW_PATH" "$GATEWAY_PLIST" 2>/dev/null || true
-        echo "[OK] Gateway plist PATH updated (added: ${REQUIRED_DIRS[*]})"
+        GH_DIR="$(dirname "$(which gh)" 2>/dev/null || echo "")"
+        if [ -n "$GH_DIR" ] && [[ ":$PLIST_PATH:" != *":$GH_DIR:"* ]]; then
+            REQUIRED_DIRS+=("$GH_DIR")
+            NEEDS_UPDATE=true
+        fi
+        LOCAL_BIN="$HOME/.local/bin"
+        if [ -d "$LOCAL_BIN" ] && [[ ":$PLIST_PATH:" != *":$LOCAL_BIN:"* ]]; then
+            REQUIRED_DIRS+=("$LOCAL_BIN")
+            NEEDS_UPDATE=true
+        fi
+        if [ "$NEEDS_UPDATE" = true ] && [ -n "$PLIST_PATH" ]; then
+            NEW_PATH="$PLIST_PATH"
+            for dir in "${REQUIRED_DIRS[@]}"; do
+                NEW_PATH="$NEW_PATH:$dir"
+            done
+            /usr/libexec/PlistBuddy -c "Set :EnvironmentVariables:PATH $NEW_PATH" "$GATEWAY_PLIST" 2>/dev/null || true
+            echo "[OK] Gateway plist PATH updated (added: ${REQUIRED_DIRS[*]})"
+        else
+            echo "[OK] Gateway plist PATH already includes required dirs"
+        fi
     else
-        echo "[OK] Gateway plist PATH already includes required dirs"
+        echo "[INFO] No gateway plist found at $GATEWAY_PLIST — gateway install will create it"
     fi
 else
-    echo "[INFO] No gateway plist found at $GATEWAY_PLIST — gateway install will create it"
+    echo "[INFO] Linux detected — skipping launchd plist PATH update"
 fi
 
 # ── 7. Flush context & clean sessions ─────────────────────────────────
@@ -354,22 +346,25 @@ else
     echo "[INFO] No dashboard-sync.sh found — skipping"
 fi
 
-# ── 15. PR ledger sync (launchd, runs every 60s) ─────────────────────
-LEDGER_PLIST="$HOME/Library/LaunchAgents/com.clawoss.pr-ledger-sync.plist"
-launchctl unload "$LEDGER_PLIST" 2>/dev/null || true
-
-if [ -f "$PROJECT_DIR/config/com.clawoss.pr-ledger-sync.plist" ]; then
-    sed \
-        -e "s|__PROJECT_DIR__|$PROJECT_DIR|g" \
-        -e "s|__HOME_DIR__|$HOME|g" \
-        "$PROJECT_DIR/config/com.clawoss.pr-ledger-sync.plist" > "$LEDGER_PLIST"
-    launchctl load "$LEDGER_PLIST" 2>/dev/null || true
-    echo "[OK] PR ledger sync installed (launchd, 60s interval)"
-elif [ -f "$LEDGER_PLIST" ]; then
-    launchctl load "$LEDGER_PLIST" 2>/dev/null || true
-    echo "[OK] PR ledger sync loaded (existing plist)"
+# ── 15. PR ledger sync (macOS launchd only) ──────────────────────────
+if [[ "$(uname)" == "Darwin" ]]; then
+    LEDGER_PLIST="$HOME/Library/LaunchAgents/com.clawoss.pr-ledger-sync.plist"
+    launchctl unload "$LEDGER_PLIST" 2>/dev/null || true
+    if [ -f "$PROJECT_DIR/config/com.clawoss.pr-ledger-sync.plist" ]; then
+        sed \
+            -e "s|__PROJECT_DIR__|$PROJECT_DIR|g" \
+            -e "s|__HOME_DIR__|$HOME|g" \
+            "$PROJECT_DIR/config/com.clawoss.pr-ledger-sync.plist" > "$LEDGER_PLIST"
+        launchctl load "$LEDGER_PLIST" 2>/dev/null || true
+        echo "[OK] PR ledger sync installed (launchd, 60s interval)"
+    elif [ -f "$LEDGER_PLIST" ]; then
+        launchctl load "$LEDGER_PLIST" 2>/dev/null || true
+        echo "[OK] PR ledger sync loaded (existing plist)"
+    else
+        echo "[INFO] No pr-ledger-sync plist found — skipping"
+    fi
 else
-    echo "[INFO] No pr-ledger-sync plist found — skipping"
+    echo "[INFO] Linux detected — skipping launchd PR ledger sync (use cron or dashboard-sync.sh)"
 fi
 
 # ── 15b. Ensure dual push remotes (CMLKevin + billion-token-one-task) ──
