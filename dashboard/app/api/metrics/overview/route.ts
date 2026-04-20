@@ -214,6 +214,8 @@ export async function GET() {
         ? Math.round((totalCostAllTime / budgetUsd) * 100)
         : null;
 
+    const activeModel = process.env.LLM_MODEL || null;
+
     return NextResponse.json({
       agentStatus: {
         isOnline,
@@ -239,6 +241,7 @@ export async function GET() {
         avgHoursToReview,
         budgetUsd,
         budgetUsedPercent,
+        activeModel,
       },
       funnel: {
         submitted: totalPRs,

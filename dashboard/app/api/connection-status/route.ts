@@ -81,6 +81,7 @@ export async function GET() {
         lastMetricAt: lastMetric[0]?.timestamp || null,
       },
       hasAnyData: hasHeartbeats || hasMetrics,
+      activeModel: process.env.LLM_MODEL || null,
     });
   } catch (error) {
     return NextResponse.json(

@@ -16,6 +16,7 @@ interface ConnectionStatus {
     lastMetricAt: string | null;
   };
   hasAnyData: boolean;
+  activeModel?: string | null;
 }
 
 export function useConnectionStatus() {
