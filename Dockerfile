@@ -19,16 +19,16 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | \
     apt-get update && apt-get install -y gh && \
     rm -rf /var/lib/apt/lists/*
 
-# Install openclaw and ensure binary is in PATH
+# Install openclaw — diagnose actual package layout then link binary
 RUN npm install -g openclaw \
- && ls "$(npm root -g)/openclaw/openclaw.mjs" 2>/dev/null \
-    || { echo "openclaw.mjs not at expected path, searching..."; find "$(npm root -g)" -name "openclaw.mjs" 2>/dev/null; } \
- && if ! which openclaw >/dev/null 2>&1; then \
-      echo "npm did not create bin link, creating wrapper..." \
-      && printf '#!/bin/sh\nexec node "%s/openclaw/openclaw.mjs" "$@"\n' "$(npm root -g)" > /usr/local/bin/openclaw \
-      && chmod +x /usr/local/bin/openclaw; \
-    fi \
- && openclaw --version
+ && echo "=== installed files (top-level) ===" \
+ && ls "$(npm root -g)/openclaw/" \
+ && echo "=== package.json bin + main ===" \
+ && node -e "var p=require('$(npm root -g)/openclaw/package.json'); console.log('bin:',JSON.stringify(p.bin)); console.log('main:',p.main);" \
+ && echo "=== all .mjs and cli files ===" \
+ && find "$(npm root -g)/openclaw" -maxdepth 2 \( -name "*.mjs" -o -name "cli*" \) 2>/dev/null | head -20 \
+ && echo "=== /usr/local/bin/openclaw* ===" \
+ && ls -la /usr/local/bin/openclaw* 2>/dev/null || echo "(none)"
 
 WORKDIR /app
 COPY . .
