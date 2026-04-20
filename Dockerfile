@@ -19,16 +19,27 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | \
     apt-get update && apt-get install -y gh && \
     rm -rf /var/lib/apt/lists/*
 
-# Install openclaw — diagnose actual package layout then link binary
-RUN npm install -g openclaw \
- && echo "=== installed files (top-level) ===" \
- && ls "$(npm root -g)/openclaw/" \
- && echo "=== package.json bin + main ===" \
- && node -e "var p=require('$(npm root -g)/openclaw/package.json'); console.log('bin:',JSON.stringify(p.bin)); console.log('main:',p.main);" \
- && echo "=== all .mjs and cli files ===" \
- && find "$(npm root -g)/openclaw" -maxdepth 2 \( -name "*.mjs" -o -name "cli*" \) 2>/dev/null | head -20 \
- && echo "=== /usr/local/bin/openclaw* ===" \
- && ls -la /usr/local/bin/openclaw* 2>/dev/null || echo "(none)"
+# Install openclaw — each step must succeed independently
+ARG CACHEBUST=1
+RUN npm cache clean --force && npm install -g openclaw
+RUN set -ex; \
+    PKG_DIR="$(npm root -g)/openclaw"; \
+    echo "--- top-level files ---"; \
+    ls "$PKG_DIR/"; \
+    echo "--- bin + main ---"; \
+    node -p "JSON.stringify(require('$PKG_DIR/package.json').bin)"; \
+    node -p "require('$PKG_DIR/package.json').main"
+RUN set -ex; \
+    PKG_DIR="$(npm root -g)/openclaw"; \
+    if [ -f "$PKG_DIR/openclaw.mjs" ]; then \
+      ENTRY="openclaw.mjs"; \
+    else \
+      ENTRY=$(node -p "require('$PKG_DIR/package.json').main || 'dist/index.js'"); \
+    fi; \
+    echo "entry=$ENTRY"; \
+    printf '#!/bin/sh\nexec node "%s/%s" "$@"\n' "$PKG_DIR" "$ENTRY" > /usr/local/bin/openclaw; \
+    chmod +x /usr/local/bin/openclaw; \
+    openclaw --version
 
 WORKDIR /app
 COPY . .
