@@ -194,7 +194,7 @@ for line in sys.stdin:
     metrics.append({
         'inputTokens': inp,
         'outputTokens': out,
-        'model': model or 'kimi-coding/k2p5',
+        'model': model or os.environ.get('LLM_MODEL', 'unknown'),
         'channel': sid
     })
 if metrics:
