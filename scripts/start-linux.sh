@@ -143,9 +143,13 @@ GATEWAY_PID=$!
 sleep 8
 
 # Start dashboard-sync in background if CLAW_API_KEY is set
+# if [ -n "${CLAW_API_KEY:-}" ]; then
+#     nohup bash "$PROJECT_DIR/scripts/dashboard-sync.sh" \
+#         > /tmp/dashboard-sync.log 2>&1 &
+#     echo "[OK] Dashboard sync started"
+# fi
 if [ -n "${CLAW_API_KEY:-}" ]; then
-    nohup bash "$PROJECT_DIR/scripts/dashboard-sync.sh" \
-        > /tmp/dashboard-sync.log 2>&1 &
+    bash "$PROJECT_DIR/scripts/dashboard-sync.sh" 2>&1 &
     echo "[OK] Dashboard sync started"
 fi
 
