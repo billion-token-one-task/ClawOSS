@@ -46,7 +46,7 @@ fi
 # OpenClaw built-in providers like "openai"). Default: prefix before first "/" in LLM_MODEL.
 # LLM_MODEL_API_ID: the model ID sent to the API. Default: full LLM_MODEL value.
 _LLM_PROVIDER_NAME="${LLM_PROVIDER_NAME:-$(echo "${LLM_MODEL}" | cut -d'/' -f1)}"
-_LLM_MODEL_API_ID="${LLM_MODEL_API_ID:-${LLM_MODEL}}"
+_LLM_MODEL_API_ID="${LLM_MODEL_API_ID:-$(echo "${LLM_MODEL}" | cut -d'/' -f2)}"
 
 REPO_CONFIG_RESOLVED=$(sed \
     -e "s|__WORKSPACE_PATH__|$WORKSPACE_DIR|g" \
