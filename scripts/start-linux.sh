@@ -123,6 +123,34 @@ with open(deployed_path, 'w') as f:
 "
 echo "[OK] Config deployed"
 
+# Write auth-profiles.json for the clawoss agent
+# OpenClaw derives the auth lookup key from the model name prefix (e.g. "openai"
+# from "openai/gpt-4o-mini"), independently of the provider name in models.providers.
+_AUTH_PROVIDER="$(echo "${LLM_MODEL}" | cut -d'/' -f1)"
+_AUTH_DIR="$HOME/.openclaw/agents/clawoss/agent"
+mkdir -p "$_AUTH_DIR"
+_AUTH_FILE="$_AUTH_DIR/auth-profiles.json"
+_AUTH_PROVIDER="$_AUTH_PROVIDER" \
+_AUTH_KEY="${LLM_API_KEY}" \
+_AUTH_BASE_URL="${LLM_BASE_URL}" \
+python3 -c "
+import json, os
+auth_file = os.environ.get('_AUTH_FILE', '') or '$_AUTH_FILE'
+provider  = os.environ['_AUTH_PROVIDER']
+api_key   = os.environ['_AUTH_KEY']
+base_url  = os.environ['_AUTH_BASE_URL']
+try:
+    with open('$_AUTH_FILE') as f:
+        data = json.load(f)
+except (FileNotFoundError, json.JSONDecodeError):
+    data = {}
+data[provider] = {'apiKey': api_key, 'baseUrl': base_url}
+with open('$_AUTH_FILE', 'w') as f:
+    json.dump(data, f, indent=2)
+    f.write('\n')
+"
+echo "[OK] Auth profile written for provider: $_AUTH_PROVIDER"
+
 # Create required directories
 mkdir -p "$HOME/.openclaw/logs" \
          "$WORKSPACE_DIR/memory/repos" \
