@@ -19,27 +19,8 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | \
     apt-get update && apt-get install -y gh && \
     rm -rf /var/lib/apt/lists/*
 
-# Install openclaw — each step must succeed independently
-ARG CACHEBUST=1
-RUN npm cache clean --force && npm install -g openclaw
-RUN set -ex; \
-    PKG_DIR="$(npm root -g)/openclaw"; \
-    echo "--- top-level files ---"; \
-    ls "$PKG_DIR/"; \
-    echo "--- bin + main ---"; \
-    node -p "JSON.stringify(require('$PKG_DIR/package.json').bin)"; \
-    node -p "require('$PKG_DIR/package.json').main"
-RUN set -ex; \
-    PKG_DIR="$(npm root -g)/openclaw"; \
-    if [ -f "$PKG_DIR/openclaw.mjs" ]; then \
-      ENTRY="openclaw.mjs"; \
-    else \
-      ENTRY=$(node -p "require('$PKG_DIR/package.json').main || 'dist/index.js'"); \
-    fi; \
-    echo "entry=$ENTRY"; \
-    printf '#!/bin/sh\nexec node "%s/%s" "$@"\n' "$PKG_DIR" "$ENTRY" > /usr/local/bin/openclaw; \
-    chmod +x /usr/local/bin/openclaw; \
-    openclaw --version
+# Install openclaw CLI (latest has bin:openclaw, 70 deps, 55 MB)
+RUN npm install -g openclaw@latest && openclaw --version
 
 WORKDIR /app
 COPY . .
