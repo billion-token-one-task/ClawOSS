@@ -1,4 +1,5 @@
 import useSWR from "swr";
+import { fetcher } from "@/lib/fetcher";
 
 interface ConnectionStatus {
   connection: {
@@ -17,13 +18,11 @@ interface ConnectionStatus {
   hasAnyData: boolean;
 }
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
-
 export function useConnectionStatus() {
   const { data, error, isLoading } = useSWR<ConnectionStatus>(
     "/api/connection-status",
     fetcher,
-    { refreshInterval: 5000 }
+    { refreshInterval: 5000, keepPreviousData: true }
   );
 
   return { data, error, isLoading };

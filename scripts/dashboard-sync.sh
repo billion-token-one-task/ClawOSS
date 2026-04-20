@@ -180,6 +180,25 @@ except:
 
   log "heartbeat: status=$ST sessions=$SESSIONS active=$LOCKS bytes=$BYTES"
 
+  # --- State sync every 6 cycles (60 seconds) ---
+  if [ $((CYCLE % 6)) -eq 0 ]; then
+    STATE_PAYLOAD=$(jq -n \
+      --argjson sessions "$SESSIONS" \
+      --argjson active "$LOCKS" \
+      --arg status "$ST" \
+      '{
+        workQueue: [],
+        pipelineState: {status: $status, activeSessions: $active, totalSessions: $sessions},
+        activeRepos: [],
+        metadata: {source: "dashboard-sync.sh"}
+      }')
+    curl -s -m 8 -X POST "$URL/api/ingest/state" \
+      -H "Authorization: Bearer $KEY" \
+      -H "Content-Type: application/json" \
+      -d "$STATE_PAYLOAD" > /dev/null 2>&1
+    log "state-sync: posted"
+  fi
+
   # --- Token metrics: extract usage data from JSONL and POST to /api/ingest/metrics ---
   for f in "$DIR"/*.jsonl; do
     [ ! -f "$f" ] && continue
