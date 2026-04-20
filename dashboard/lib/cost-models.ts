@@ -60,22 +60,30 @@ export const COST_MODELS: Record<string, CostModel> = {
   },
 };
 
-// Default model for the ClawOSS agent (switched to MiniMax M2.7 direct API)
 export const DEFAULT_MODEL = "minimax/MiniMax-M2.7";
 export const DEFAULT_COST_MODEL = COST_MODELS[DEFAULT_MODEL];
 
+/** Returns the active model from env (server-side only) or falls back to DEFAULT_MODEL. */
+export function getActiveModel(): string {
+  return process.env.LLM_MODEL || DEFAULT_MODEL;
+}
+
 /**
  * Compute the cost for a given token usage.
- * Falls back to the default Kimi Code pricing if model is unknown.
+ * Looks up the model in COST_MODELS; if not found, reads pricing from
+ * LLM_INPUT_COST_PER_MILLION / LLM_OUTPUT_COST_PER_MILLION env vars.
  */
 export function computeTokenCost(
   inputTokens: number,
   outputTokens: number,
   model?: string
 ): number {
-  const costModel = (model && COST_MODELS[model]) || DEFAULT_COST_MODEL;
-  return (
-    inputTokens * costModel.inputCostPerToken +
-    outputTokens * costModel.outputCostPerToken
-  );
+  const m = model || getActiveModel();
+  if (COST_MODELS[m]) {
+    const cm = COST_MODELS[m];
+    return inputTokens * cm.inputCostPerToken + outputTokens * cm.outputCostPerToken;
+  }
+  const inputRate = parseFloat(process.env.LLM_INPUT_COST_PER_MILLION || "0.15") / 1_000_000;
+  const outputRate = parseFloat(process.env.LLM_OUTPUT_COST_PER_MILLION || "0.60") / 1_000_000;
+  return inputTokens * inputRate + outputTokens * outputRate;
 }
