@@ -42,7 +42,7 @@ PAYLOAD=$(jq -n \
         toolCallId: $toolCallId,
         durationMs: $durationMs,
         timestamp: $ts,
-        metadata: { agent_id: "clawoss", model: "kimi-coding/k2p5" }
+        metadata: { agent_id: "clawoss", model: "${LLM_MODEL:-unknown}" }
       },
       {
         sessionId: $sid,
