@@ -20,7 +20,7 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | \
     rm -rf /var/lib/apt/lists/*
 
 # Install openclaw
-RUN npm install -g openclaw
+RUN npm install -g openclaw && which openclaw && openclaw --version
 
 WORKDIR /app
 COPY . .
