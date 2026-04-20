@@ -42,14 +42,20 @@ else
 fi
 
 # Deploy config (same sed + python3 deep-merge logic as restart.sh step 5)
+# LLM_PROVIDER_NAME: override provider key in openclaw.json (avoids conflicts with
+# OpenClaw built-in providers like "openai"). Default: prefix before first "/" in LLM_MODEL.
+# LLM_MODEL_API_ID: the model ID sent to the API. Default: full LLM_MODEL value.
+_LLM_PROVIDER_NAME="${LLM_PROVIDER_NAME:-$(echo "${LLM_MODEL}" | cut -d'/' -f1)}"
+_LLM_MODEL_API_ID="${LLM_MODEL_API_ID:-${LLM_MODEL}}"
+
 REPO_CONFIG_RESOLVED=$(sed \
     -e "s|__WORKSPACE_PATH__|$WORKSPACE_DIR|g" \
     -e "s|__PROJECT_DIR__|$PROJECT_DIR|g" \
     -e "s|__HOME_DIR__|$HOME|g" \
     -e "s|__LLM_MODEL__|${LLM_MODEL}|g" \
     -e "s|__LLM_BASE_URL__|${LLM_BASE_URL}|g" \
-    -e "s|__LLM_PROVIDER__|$(echo "${LLM_MODEL}" | cut -d'/' -f1)|g" \
-    -e "s|__LLM_MODEL_ID__|$(echo "${LLM_MODEL}" | cut -d'/' -f2)|g" \
+    -e "s|__LLM_PROVIDER__|${_LLM_PROVIDER_NAME}|g" \
+    -e "s|__LLM_MODEL_ID__|${_LLM_MODEL_API_ID}|g" \
     -e "s|__LLM_INPUT_COST__|$(echo "scale=9; ${LLM_INPUT_COST_PER_MILLION:-0.15} / 1000000" | bc)|g" \
     -e "s|__LLM_OUTPUT_COST__|$(echo "scale=9; ${LLM_OUTPUT_COST_PER_MILLION:-0.60} / 1000000" | bc)|g" \
     -e "s|__LLM_CONTEXT_WINDOW__|${LLM_CONTEXT_WINDOW:-128000}|g" \
