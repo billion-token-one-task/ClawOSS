@@ -214,7 +214,15 @@ export async function GET() {
         ? Math.round((totalCostAllTime / budgetUsd) * 100)
         : null;
 
-    const activeModel = process.env.LLM_MODEL || null;
+    // Read active model from latest heartbeat metadata (set by dashboard-sync.sh from LLM_MODEL env on Railway)
+    const activeModel = (() => {
+      try {
+        const meta = hb?.metadata;
+        if (!meta) return null;
+        const parsed = typeof meta === "string" ? JSON.parse(meta) : meta;
+        return (parsed as Record<string, unknown>)?.model as string | null ?? null;
+      } catch { return null; }
+    })();
 
     return NextResponse.json({
       agentStatus: {

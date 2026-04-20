@@ -176,7 +176,8 @@ except:
     --argjson active "$LOCKS" \
     --argjson totalBytes "${BYTES:-0}" \
     --arg source "dashboard-sync.sh" \
-    '{sessionCount:$sessions, activeCount:$active, totalBytes:$totalBytes, source:$source}' 2>/dev/null || echo '{}')
+    --arg model "${LLM_MODEL:-unknown}" \
+    '{sessionCount:$sessions, activeCount:$active, totalBytes:$totalBytes, source:$source, model:$model}' 2>/dev/null || echo '{}')
 
   curl -s -m 8 -X POST "$URL/api/ingest/heartbeat" \
     -H "Authorization: Bearer $KEY" \

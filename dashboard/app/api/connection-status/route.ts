@@ -81,7 +81,14 @@ export async function GET() {
         lastMetricAt: lastMetric[0]?.timestamp || null,
       },
       hasAnyData: hasHeartbeats || hasMetrics,
-      activeModel: process.env.LLM_MODEL || null,
+      activeModel: (() => {
+        try {
+          const meta = hb?.metadata;
+          if (!meta) return null;
+          const parsed = typeof meta === "string" ? JSON.parse(meta) : meta;
+          return (parsed as Record<string, unknown>)?.model as string | null ?? null;
+        } catch { return null; }
+      })(),
     });
   } catch (error) {
     return NextResponse.json(
