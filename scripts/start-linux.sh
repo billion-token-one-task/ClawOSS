@@ -78,6 +78,17 @@ def deep_merge(base, override):
 repo_config = json.loads(os.environ['_REPO_CONFIG'])
 deployed_path = os.environ['_DEPLOYED']
 
+# Coerce string placeholders to numbers (sed produces strings in JSON)
+for m in repo_config.get('models', {}).get('providers', {}).values():
+    for model in m.get('models', []):
+        for k in ('contextWindow', 'maxTokens'):
+            if isinstance(model.get(k), str):
+                model[k] = int(model[k])
+        cost = model.get('cost', {})
+        for k in ('input', 'output'):
+            if isinstance(cost.get(k), str):
+                cost[k] = float(cost[k])
+
 try:
     with open(deployed_path) as f:
         deployed = json.load(f)
