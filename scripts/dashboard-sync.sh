@@ -154,7 +154,16 @@ except:
   SESSIONS=$(ls "$DIR"/*.jsonl 2>/dev/null | grep -v '.reset.' | wc -l | tr -d ' ')
   BYTES=$(cat "$DIR"/*.jsonl 2>/dev/null | wc -c | tr -d ' ')
 
+  # Check if openclaw gateway process is running (covers between-heartbeat idle periods)
+  GATEWAY_RUNNING=false
+  if pgrep -f "openclaw" > /dev/null 2>&1; then
+    GATEWAY_RUNNING=true
+  fi
+
   if [ "$LOCKS" -gt 0 ]; then
+    ST="alive"
+  elif [ "$GATEWAY_RUNNING" = "true" ]; then
+    # Gateway is running but no active session — agent is idle between heartbeat ticks
     ST="alive"
   elif [ "$SESSIONS" -gt 0 ]; then
     ST="degraded"

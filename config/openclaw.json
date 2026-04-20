@@ -63,7 +63,7 @@
   "models": {
     "mode": "merge",
     "providers": {
-      "llm": {
+      "__LLM_PROVIDER__": {
         "baseUrl": "__LLM_BASE_URL__",
         "apiKey": "${LLM_API_KEY}",
         "api": "openai-completions",

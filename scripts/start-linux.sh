@@ -48,6 +48,7 @@ REPO_CONFIG_RESOLVED=$(sed \
     -e "s|__HOME_DIR__|$HOME|g" \
     -e "s|__LLM_MODEL__|${LLM_MODEL}|g" \
     -e "s|__LLM_BASE_URL__|${LLM_BASE_URL}|g" \
+    -e "s|__LLM_PROVIDER__|$(echo "${LLM_MODEL}" | cut -d'/' -f1)|g" \
     -e "s|__LLM_MODEL_ID__|$(echo "${LLM_MODEL}" | cut -d'/' -f2)|g" \
     -e "s|__LLM_INPUT_COST__|$(echo "scale=9; ${LLM_INPUT_COST_PER_MILLION:-0.15} / 1000000" | bc)|g" \
     -e "s|__LLM_OUTPUT_COST__|$(echo "scale=9; ${LLM_OUTPUT_COST_PER_MILLION:-0.60} / 1000000" | bc)|g" \
