@@ -19,17 +19,14 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | \
     apt-get update && apt-get install -y gh && \
     rm -rf /var/lib/apt/lists/*
 
-# Install openclaw
+# Install openclaw and ensure binary is linked
 RUN npm install -g openclaw \
- && npm root -g \
- && npm bin -g \
- && ls -la $(npm root -g) \
- && ls -la $(npm root -g)/openclaw \
- && ls -la /usr/local/bin || true \
- && find / -name "openclaw*" 2>/dev/null | head -50
-
-RUN which openclaw && echo "openclaw found" || echo "openclaw not found"
-RUN openclaw --version
+ && if ! which openclaw >/dev/null 2>&1; then \
+      echo "npm did not create bin link, linking manually..." \
+      && ln -sf "$(npm root -g)/openclaw/openclaw.mjs" /usr/local/bin/openclaw \
+      && chmod +x /usr/local/bin/openclaw; \
+    fi \
+ && openclaw --version
 
 WORKDIR /app
 COPY . .
