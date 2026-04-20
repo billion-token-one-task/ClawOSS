@@ -63,7 +63,7 @@
   "models": {
     "mode": "merge",
     "providers": {
-      "__LLM_PROVIDER__": {
+      "custom_proxy": {
         "baseUrl": "__LLM_BASE_URL__",
         "apiKey": "${LLM_API_KEY}",
         "models": [
