@@ -66,8 +66,6 @@
       "__LLM_PROVIDER__": {
         "baseUrl": "__LLM_BASE_URL__",
         "apiKey": "${LLM_API_KEY}",
-        "api": "openai-completions",
-        "authHeader": true,
         "models": [
           {
             "id": "__LLM_MODEL_ID__",
