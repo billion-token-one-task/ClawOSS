@@ -31,8 +31,16 @@ if [ -z "${GITHUB_TOKEN:-}" ]; then
     echo "Error: GITHUB_TOKEN not set in .env"
     exit 1
 fi
-if [ -z "${KIMI_API_KEY:-}" ]; then
-    echo "Error: KIMI_API_KEY not set in .env (required — OpenRouter is not supported due to content filter)"
+if [ -z "${LLM_API_KEY:-}" ]; then
+    echo "Error: LLM_API_KEY not set in .env"
+    exit 1
+fi
+if [ -z "${LLM_MODEL:-}" ]; then
+    echo "Error: LLM_MODEL not set in .env"
+    exit 1
+fi
+if [ -z "${LLM_BASE_URL:-}" ]; then
+    echo "Error: LLM_BASE_URL not set in .env"
     exit 1
 fi
 echo "[OK] API keys configured"
@@ -83,7 +91,9 @@ sed \
 
 # Inject env vars into deployed config (via env vars, not shell interpolation)
 _CONFIG_PATH="$OPENCLAW_DIR/openclaw.json" \
-_KIMI_KEY="${KIMI_API_KEY:-}" \
+_LLM_KEY="${LLM_API_KEY:-}" \
+_LLM_MODEL="${LLM_MODEL:-}" \
+_LLM_BASE_URL="${LLM_BASE_URL:-}" \
 _GH_TOKEN="${GITHUB_TOKEN:-}" \
 _DASH_URL="${DASHBOARD_URL:-https://clawoss-dashboard.vercel.app}" \
 _CLAW_KEY="${CLAW_API_KEY:-}" \
@@ -93,7 +103,9 @@ config_path = os.environ['_CONFIG_PATH']
 with open(config_path) as f: c = json.load(f)
 c.setdefault('env', {})
 env_vars = {
-    'KIMI_API_KEY': os.environ.get('_KIMI_KEY', ''),
+    'LLM_API_KEY': os.environ.get('_LLM_KEY', ''),
+    'LLM_MODEL': os.environ.get('_LLM_MODEL', ''),
+    'LLM_BASE_URL': os.environ.get('_LLM_BASE_URL', ''),
     'GITHUB_TOKEN': os.environ.get('_GH_TOKEN', ''),
     'DASHBOARD_URL': os.environ.get('_DASH_URL', ''),
     'CLAW_API_KEY': os.environ.get('_CLAW_KEY', ''),

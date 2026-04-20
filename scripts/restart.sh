@@ -95,16 +95,23 @@ REPO_CONFIG_RESOLVED=$(sed \
     -e "s|__WORKSPACE_PATH__|$WORKSPACE_DIR|g" \
     -e "s|__PROJECT_DIR__|$PROJECT_DIR|g" \
     -e "s|__HOME_DIR__|$HOME|g" \
+    -e "s|__LLM_MODEL__|${LLM_MODEL:-openai/gpt-4o-mini}|g" \
+    -e "s|__LLM_BASE_URL__|${LLM_BASE_URL:-https://api.openai.com/v1}|g" \
+    -e "s|__LLM_MODEL_ID__|$(echo "${LLM_MODEL:-openai/gpt-4o-mini}" | cut -d'/' -f2)|g" \
+    -e "s|__LLM_INPUT_COST__|$(echo "scale=9; ${LLM_INPUT_COST_PER_MILLION:-0.15} / 1000000" | bc)|g" \
+    -e "s|__LLM_OUTPUT_COST__|$(echo "scale=9; ${LLM_OUTPUT_COST_PER_MILLION:-0.60} / 1000000" | bc)|g" \
+    -e "s|__LLM_CONTEXT_WINDOW__|${LLM_CONTEXT_WINDOW:-128000}|g" \
+    -e "s|__LLM_MAX_TOKENS__|${LLM_MAX_TOKENS:-16384}|g" \
     "$PROJECT_DIR/config/openclaw.json")
 
 _REPO_CONFIG="$REPO_CONFIG_RESOLVED" \
 _DEPLOYED="$DEPLOYED_CONFIG" \
-_KIMI_KEY="${KIMI_API_KEY:-}" \
-_MINIMAX_KEY="${MINIMAX_API_KEY:-}" \
+_LLM_KEY="${LLM_API_KEY:-}" \
+_LLM_MODEL="${LLM_MODEL:-}" \
+_LLM_BASE_URL="${LLM_BASE_URL:-}" \
 _GH_TOKEN="${GITHUB_TOKEN:-}" \
 _DASH_URL="${DASHBOARD_URL:-https://clawoss-dashboard.vercel.app}" \
 _CLAW_KEY="${CLAW_API_KEY:-}" \
-_OPENROUTER_KEY="${OPENROUTER_API_KEY:-}" \
 python3 -c "
 import json, os
 
@@ -131,12 +138,12 @@ merged = deep_merge(deployed, repo_config)
 # Inject env vars (non-empty only)
 merged.setdefault('env', {})
 env_map = {
-    'KIMI_API_KEY': os.environ.get('_KIMI_KEY', ''),
-    'MINIMAX_API_KEY': os.environ.get('_MINIMAX_KEY', ''),
+    'LLM_API_KEY': os.environ.get('_LLM_KEY', ''),
+    'LLM_MODEL': os.environ.get('_LLM_MODEL', ''),
+    'LLM_BASE_URL': os.environ.get('_LLM_BASE_URL', ''),
     'GITHUB_TOKEN': os.environ.get('_GH_TOKEN', ''),
     'DASHBOARD_URL': os.environ.get('_DASH_URL', ''),
     'CLAW_API_KEY': os.environ.get('_CLAW_KEY', ''),
-    'OPENROUTER_API_KEY': os.environ.get('_OPENROUTER_KEY', ''),
 }
 for k, v in env_map.items():
     if v:
@@ -316,7 +323,7 @@ echo "[OK] Gateway stopped"
 
 # ── 13. Start gateway (prefer install for launchd, fallback to run) ───
 # `gateway install` creates/updates the launchd plist and loads it.
-# The plist has all env vars baked in (KIMI_API_KEY, GITHUB_TOKEN, etc.)
+# The plist has all env vars baked in (LLM_API_KEY, GITHUB_TOKEN, etc.)
 # `gateway run &` is a fallback that inherits the current shell env.
 if openclaw gateway install 2>/dev/null; then
     echo "[OK] Gateway installed via launchd"
@@ -414,7 +421,7 @@ fi
 # ── Summary ───────────────────────────────────────────────────────────
 echo ""
 echo "=== ClawOSS V10 Running ==="
-echo "  Model: minimax/m2.7 (MiniMax M2.7, 204k context) + kimi-coding/k2p5 fallback"
+echo "  Model: ${LLM_MODEL:-openai/gpt-4o-mini} (${LLM_BASE_URL:-https://api.openai.com/v1})"
 echo "  Dashboard: https://clawoss-dashboard.vercel.app"
 echo "  Slots: 3 always-on (scout + PR monitor + PR analyst) + 10 impl/followup = 13"
 echo "  Heartbeat: 5m"
