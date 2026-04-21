@@ -10,6 +10,7 @@ interface GatewayStatusProps {
   heartbeatsLastHour: number;
   errorsLastHour: number;
   sessions: ConversationSession[];
+  activeModel?: string | null;
 }
 
 const SKILLS = [
@@ -35,6 +36,7 @@ export function GatewayStatus({
   heartbeatsLastHour,
   errorsLastHour,
   sessions,
+  activeModel,
 }: GatewayStatusProps) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
@@ -100,7 +102,7 @@ export function GatewayStatus({
         </div>
         <div className="flex justify-between">
           <span className="stat-label">Model</span>
-          <span className="text-foreground/60">kimi-coding/k2p5</span>
+          <span className="text-foreground/60">{activeModel ?? "unknown"}</span>
         </div>
         <div className="flex justify-between">
           <span className="stat-label">Auth</span>

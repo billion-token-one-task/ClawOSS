@@ -21,6 +21,7 @@ interface MetricCardsProps {
   costPerMerge?: number;
   tokensPerMerge?: number;
   avgHoursToReview?: number | null;
+  activeModel?: string | null;
 }
 
 function MiniBar({
@@ -109,6 +110,7 @@ export function MetricCards({
   costPerMerge,
   tokensPerMerge,
   avgHoursToReview,
+  activeModel,
 }: MetricCardsProps) {
   const mergeColor =
     mergeRate >= 50
@@ -137,7 +139,7 @@ export function MetricCards({
     {
       label: "Cost/24h",
       value: formatCost(costToday),
-      sub: costToday > 0 ? "kimi k2.5" : null,
+      sub: costToday > 0 ? (activeModel ?? "unknown model") : null,
       bar: { value: costToday, max: 5 },
     },
     {

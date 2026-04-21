@@ -317,6 +317,7 @@ export default function LivePage() {
                 heartbeatsLastHour={heartbeatsLastHour}
                 errorsLastHour={errorsLastHour}
                 sessions={sessions}
+                activeModel={connectionData?.activeModel}
               />
             ) : (
               <>
