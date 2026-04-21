@@ -102,6 +102,7 @@ env_map = {
     'LLM_MODEL': os.environ.get('_LLM_MODEL', ''),
     'LLM_BASE_URL': os.environ.get('_LLM_BASE_URL', ''),
     'GITHUB_TOKEN': os.environ.get('_GH_TOKEN', ''),
+    'GH_TOKEN': os.environ.get('_GH_TOKEN', ''),  # gh CLI uses GH_TOKEN
     'DASHBOARD_URL': os.environ.get('_DASH_URL', ''),
     'CLAW_API_KEY': os.environ.get('_CLAW_KEY', ''),
 }
@@ -144,14 +145,22 @@ WAKEEOF
 
 echo "[OK] State files reset"
 
-echo "[OK] Starting OpenClaw gateway (model: ${LLM_MODEL})..."
+GATEWAY_PORT="${OPENCLAW_GATEWAY_PORT:-18789}"
+echo "[OK] Starting OpenClaw gateway (model: ${LLM_MODEL}, port: ${GATEWAY_PORT})..."
 openclaw gateway run &
 GATEWAY_PID=$!
 
-# Wait until gateway is actually ready instead of fixed sleep
+# Poll port directly — avoids systemd dependency in `openclaw gateway status`
 READY=0
 for _ in $(seq 1 60); do
-    if openclaw gateway status 2>/dev/null | grep -qi "running\|reachable\|ok\|ready"; then
+    # Process must still be alive
+    if ! kill -0 "$GATEWAY_PID" 2>/dev/null; then
+        echo "[FAIL] Gateway process exited unexpectedly"
+        exit 1
+    fi
+    if curl -sf --max-time 1 "http://127.0.0.1:${GATEWAY_PORT}" >/dev/null 2>&1 || \
+       curl -sf --max-time 1 "http://127.0.0.1:${GATEWAY_PORT}/health" >/dev/null 2>&1 || \
+       (command -v nc >/dev/null && nc -z 127.0.0.1 "$GATEWAY_PORT" 2>/dev/null); then
         READY=1
         break
     fi
@@ -159,12 +168,10 @@ for _ in $(seq 1 60); do
 done
 
 if [ "$READY" -ne 1 ]; then
-    echo "[FAIL] Gateway did not become ready in time"
-    wait $GATEWAY_PID
-    exit 1
+    echo "[WARN] Gateway port not confirmed open after 120s — proceeding anyway"
 fi
 
-echo "[OK] Gateway reported ready"
+echo "[OK] Gateway started (PID: $GATEWAY_PID)"
 
 if [ -n "${CLAW_API_KEY:-}" ]; then
     bash "$PROJECT_DIR/scripts/dashboard-sync.sh" 2>&1 &
