@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Linux/Docker compatible start script — replaces the macOS launchd portions of restart.sh
 set -euo pipefail
 
 echo "=== ClawOSS Linux Start ==="
@@ -9,20 +8,17 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 WORKSPACE_DIR="$PROJECT_DIR/workspace"
 DEPLOYED_CONFIG="$HOME/.openclaw/openclaw.json"
 
-# Validate required environment variables
 : "${LLM_API_KEY:?LLM_API_KEY is required}"
 : "${LLM_MODEL:?LLM_MODEL is required}"
 : "${LLM_BASE_URL:?LLM_BASE_URL is required}"
 : "${GITHUB_TOKEN:?GITHUB_TOKEN is required}"
 
-# Git identity
 GITHUB_USERNAME="${GITHUB_USERNAME:-BillionClaw}"
 GITHUB_EMAIL="${GITHUB_EMAIL:-267901332+BillionClaw@users.noreply.github.com}"
 git config --global user.name "$GITHUB_USERNAME"
 git config --global user.email "$GITHUB_EMAIL"
 echo "[OK] Git identity: $GITHUB_USERNAME <$GITHUB_EMAIL>"
 
-# GitHub CLI auth
 echo "$GITHUB_TOKEN" | gh auth login --with-token 2>/dev/null || true
 if gh auth status &>/dev/null; then
     echo "[OK] GitHub CLI authenticated"
@@ -30,7 +26,6 @@ else
     echo "[WARN] GitHub CLI auth failed — gh commands may fail"
 fi
 
-# Link workspace
 mkdir -p "$HOME/.openclaw"
 OC_WORKSPACE="$HOME/.openclaw/workspace"
 if [ ! -L "$OC_WORKSPACE" ] || [ "$(readlink "$OC_WORKSPACE" 2>/dev/null)" != "$WORKSPACE_DIR" ]; then
@@ -41,11 +36,8 @@ else
     echo "[OK] Workspace already linked"
 fi
 
-# Deploy config (same sed + python3 deep-merge logic as restart.sh step 5)
-# LLM_PROVIDER_NAME: override provider key in openclaw.json (avoids conflicts with
-# OpenClaw built-in providers like "openai"). Default: prefix before first "/" in LLM_MODEL.
-# LLM_MODEL_API_ID: the model ID sent to the API. Default: full LLM_MODEL value.
-_LLM_PROVIDER_NAME="${LLM_PROVIDER_NAME:-$(echo "${LLM_MODEL}" | cut -d'/' -f1)}"
+# Use a non-built-in provider key by default to avoid collisions with OpenClaw's native providers.
+_LLM_PROVIDER_NAME="${LLM_PROVIDER_NAME:-router}"
 _LLM_MODEL_API_ID="${LLM_MODEL_API_ID:-${LLM_MODEL}}"
 
 REPO_CONFIG_RESOLVED=$(sed \
@@ -85,9 +77,8 @@ def deep_merge(base, override):
 repo_config = json.loads(os.environ['_REPO_CONFIG'])
 deployed_path = os.environ['_DEPLOYED']
 
-# Coerce string placeholders to numbers (sed produces strings in JSON)
-for m in repo_config.get('models', {}).get('providers', {}).values():
-    for model in m.get('models', []):
+for p in repo_config.get('models', {}).get('providers', {}).values():
+    for model in p.get('models', []):
         for k in ('contextWindow', 'maxTokens'):
             if isinstance(model.get(k), str):
                 model[k] = int(model[k])
@@ -123,41 +114,6 @@ with open(deployed_path, 'w') as f:
 "
 echo "[OK] Config deployed"
 
-# Write auth-profiles.json for the clawoss agent.
-# OpenClaw's auth store uses profile keys in "<provider>:default" format.
-# The provider is derived from the model name prefix (e.g. "openai" from "openai/gpt-4o-mini").
-_AUTH_PROVIDER="$(echo "${LLM_MODEL}" | cut -d'/' -f1)"
-_AUTH_DIR="$HOME/.openclaw/agents/clawoss/agent"
-mkdir -p "$_AUTH_DIR"
-_AUTH_FILE="$_AUTH_DIR/auth-profiles.json"
-_PROFILE_KEY="${_AUTH_PROVIDER}:default"
-python3 -c "
-import json, os, sys
-auth_file = '${_AUTH_FILE}'
-profile_key = '${_PROFILE_KEY}'
-provider  = '${_AUTH_PROVIDER}'
-api_key   = os.environ.get('LLM_API_KEY', '')
-base_url  = os.environ.get('LLM_BASE_URL', '')
-try:
-    with open(auth_file) as f:
-        data = json.load(f)
-except (FileNotFoundError, json.JSONDecodeError):
-    data = {}
-data.setdefault('version', 1)
-data.setdefault('profiles', {})
-data['profiles'][profile_key] = {
-    'type': 'apikey',
-    'provider': provider,
-    'apiKey': api_key,
-    'baseUrl': base_url,
-}
-with open(auth_file, 'w') as f:
-    json.dump(data, f, indent=2)
-    f.write('\n')
-"
-echo "[OK] Auth profile written: ${_PROFILE_KEY}"
-
-# Create required directories
 mkdir -p "$HOME/.openclaw/logs" \
          "$WORKSPACE_DIR/memory/repos" \
          "$WORKSPACE_DIR/memory/issues" \
@@ -165,7 +121,6 @@ mkdir -p "$HOME/.openclaw/logs" \
          "$WORKSPACE_DIR/memory/subagent-inputs"
 echo "[OK] Directories ready"
 
-# Reset spawn state
 cat > "$WORKSPACE_DIR/memory/impl-spawn-state.md" << 'SPAWNEOF'
 # Implementation Spawn State — Reset by start-linux.sh
 
@@ -187,33 +142,39 @@ WAKEEOF
 
 echo "[OK] State files reset"
 
-# Start gateway in foreground (suitable for containers — process keeps container alive)
 echo "[OK] Starting OpenClaw gateway (model: ${LLM_MODEL})..."
 openclaw gateway run &
 GATEWAY_PID=$!
 
-sleep 8
+# Wait until gateway is actually ready instead of fixed sleep
+READY=0
+for _ in $(seq 1 60); do
+    if openclaw gateway status 2>/dev/null | grep -qi "running\|reachable\|ok\|ready"; then
+        READY=1
+        break
+    fi
+    sleep 2
+done
 
-# Start dashboard-sync in background if CLAW_API_KEY is set
-# if [ -n "${CLAW_API_KEY:-}" ]; then
-#     nohup bash "$PROJECT_DIR/scripts/dashboard-sync.sh" \
-#         > /tmp/dashboard-sync.log 2>&1 &
-#     echo "[OK] Dashboard sync started"
-# fi
+if [ "$READY" -ne 1 ]; then
+    echo "[FAIL] Gateway did not become ready in time"
+    wait $GATEWAY_PID
+    exit 1
+fi
+
+echo "[OK] Gateway reported ready"
+
 if [ -n "${CLAW_API_KEY:-}" ]; then
     bash "$PROJECT_DIR/scripts/dashboard-sync.sh" 2>&1 &
     echo "[OK] Dashboard sync started"
 fi
 
-# Kick the agent
 openclaw system event \
     --text "ClawOSS Linux start. Execute HEARTBEAT.md steps 0-7. Fill all impl slots. NEVER idle." \
-    --mode now 2>/dev/null || true
+    --mode now || echo "[WARN] Failed to dispatch initial system event"
 
 echo "[OK] ClawOSS running. Gateway PID: $GATEWAY_PID"
 echo "  Model: ${LLM_MODEL}"
-echo "  Logs: openclaw logs"
 echo "  PRs: gh search prs --author ${GITHUB_USERNAME} --state open"
 
-# Keep container alive
 wait $GATEWAY_PID
