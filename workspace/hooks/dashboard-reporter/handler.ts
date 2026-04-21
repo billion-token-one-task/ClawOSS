@@ -1,9 +1,12 @@
 const DASHBOARD_URL = process.env.DASHBOARD_URL || "https://clawoss-dashboard.vercel.app";
 const AGENT_ID = "clawoss";
 const GITHUB_USERNAME = "BillionClaw";
-// Kimi Code K2.5 direct API pricing: $0.60/M input, $3.00/M output (switched in commit c98540f)
-const INPUT_COST_PER_TOKEN = 0.6 / 1_000_000;
-const OUTPUT_COST_PER_TOKEN = 3.0 / 1_000_000;
+const LLM_MODEL = process.env.LLM_MODEL || "unknown";
+const LLM_PROVIDER = process.env.LLM_BASE_URL
+  ? new URL(process.env.LLM_BASE_URL).hostname.split(".")[0]
+  : "unknown";
+const INPUT_COST_PER_TOKEN = parseFloat(process.env.LLM_INPUT_COST_PER_MILLION || "0.15") / 1_000_000;
+const OUTPUT_COST_PER_TOKEN = parseFloat(process.env.LLM_OUTPUT_COST_PER_MILLION || "0.60") / 1_000_000;
 
 let accumulatedInputTokens = 0;
 let accumulatedOutputTokens = 0;
@@ -168,7 +171,7 @@ async function postState(apiKey: string): Promise<void> {
         metadata: {
           agent_id: AGENT_ID,
           tool_calls: toolCallCount,
-          model: "kimi-coding/k2p5",
+          model: LLM_MODEL,
         },
       }),
       signal: controller.signal,
@@ -547,7 +550,7 @@ const handler = async (event: {
           metadata: {
             session_key: sessionId,
             tool_calls: toolCallCount,
-            model: "kimi-coding/k2p5",
+            model: LLM_MODEL,
             repos: Array.from(reposUsed),
             skill: lastSkillName,
           },
@@ -567,8 +570,8 @@ const handler = async (event: {
             metrics: [
               {
                 channel: "agent",
-                provider: "kimi-direct",
-                model: "kimi-coding/k2p5",
+                provider: LLM_PROVIDER,
+                model: LLM_MODEL,
                 inputTokens: accumulatedInputTokens,
                 outputTokens: accumulatedOutputTokens,
                 costUsd: Math.round(costUsd * 1_000_000) / 1_000_000,

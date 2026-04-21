@@ -3,8 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAgentState } from "@/lib/hooks/use-agent-state";
 import useSWR from "swr";
-
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+import { fetcher } from "@/lib/fetcher";
 
 interface FunnelStage {
   label: string;
@@ -23,7 +22,7 @@ export function DiscoveryPipeline() {
       closedPRs: number;
       reviewedPRs: number;
     };
-  }>("/api/metrics/overview", fetcher, { refreshInterval: 30_000 });
+  }>("/api/metrics/overview", fetcher, { refreshInterval: 30_000, keepPreviousData: true });
 
   // Work queue = discovered/triaged issues
   const workQueue = stateData?.state?.workQueue;
