@@ -94,6 +94,42 @@ log "Session map built: $(_SESSION_MAP="$SESSION_MAP" python3 -c "import json, o
 CYCLE=0
 
 while true; do
+
+  # --- Budget guard ---
+  if [ -n "${TOKEN_BUDGET_USD:-}" ] && [ "${TOKEN_BUDGET_USD}" != "0" ]; then
+    TOTAL_COST=$(curl -s -m 5 \
+      -H "Authorization: Bearer $KEY" \
+      "$URL/api/metrics/overview" 2>/dev/null | \
+      python3 -c "
+import json,sys
+try:
+    d=json.load(sys.stdin)
+    print(d.get('stats',{}).get('totalCostAllTime',0))
+except:
+    print(0)
+" 2>/dev/null || echo "0")
+
+    OVER_BUDGET=$(python3 -c "
+try:
+    over = float('$TOTAL_COST') >= float('$TOKEN_BUDGET_USD')
+    print('yes' if over else 'no')
+except:
+    print('no')
+" 2>/dev/null || echo "no")
+
+    if [ "$OVER_BUDGET" = "yes" ]; then
+      log "BUDGET EXCEEDED: spent=\$$TOTAL_COST budget=\$$TOKEN_BUDGET_USD — stopping gateway"
+      curl -s -m 5 -X POST "$URL/api/ingest/heartbeat" \
+        -H "Authorization: Bearer $KEY" \
+        -H "Content-Type: application/json" \
+        -d "{\"status\":\"offline\",\"currentTask\":\"BUDGET EXCEEDED: spent \$$TOTAL_COST of \$$TOKEN_BUDGET_USD\"}" \
+        >/dev/null 2>&1
+      openclaw gateway stop 2>/dev/null || true
+      sleep "${BUDGET_CHECK_INTERVAL:-60}"
+      continue
+    fi
+  fi
+
   CYCLE=$((CYCLE + 1))
 
   # --- Self-update check every 6 cycles (60 seconds) ---
@@ -118,7 +154,16 @@ while true; do
   SESSIONS=$(ls "$DIR"/*.jsonl 2>/dev/null | grep -v '.reset.' | wc -l | tr -d ' ')
   BYTES=$(cat "$DIR"/*.jsonl 2>/dev/null | wc -c | tr -d ' ')
 
+  # Check if openclaw gateway process is running (covers between-heartbeat idle periods)
+  GATEWAY_RUNNING=false
+  if pgrep -f "openclaw" > /dev/null 2>&1; then
+    GATEWAY_RUNNING=true
+  fi
+
   if [ "$LOCKS" -gt 0 ]; then
+    ST="alive"
+  elif [ "$GATEWAY_RUNNING" = "true" ]; then
+    # Gateway is running but no active session — agent is idle between heartbeat ticks
     ST="alive"
   elif [ "$SESSIONS" -gt 0 ]; then
     ST="degraded"
@@ -131,7 +176,8 @@ while true; do
     --argjson active "$LOCKS" \
     --argjson totalBytes "${BYTES:-0}" \
     --arg source "dashboard-sync.sh" \
-    '{sessionCount:$sessions, activeCount:$active, totalBytes:$totalBytes, source:$source}' 2>/dev/null || echo '{}')
+    --arg model "${LLM_MODEL:-unknown}" \
+    '{sessionCount:$sessions, activeCount:$active, totalBytes:$totalBytes, source:$source, model:$model}' 2>/dev/null || echo '{}')
 
   curl -s -m 8 -X POST "$URL/api/ingest/heartbeat" \
     -H "Authorization: Bearer $KEY" \
@@ -143,6 +189,25 @@ while true; do
       '{status:$status, currentTask:$currentTask, metadata:$metadata}')" > /dev/null 2>&1
 
   log "heartbeat: status=$ST sessions=$SESSIONS active=$LOCKS bytes=$BYTES"
+
+  # --- State sync every 6 cycles (60 seconds) ---
+  if [ $((CYCLE % 6)) -eq 0 ]; then
+    STATE_PAYLOAD=$(jq -n \
+      --argjson sessions "$SESSIONS" \
+      --argjson active "$LOCKS" \
+      --arg status "$ST" \
+      '{
+        workQueue: [],
+        pipelineState: {status: $status, activeSessions: $active, totalSessions: $sessions},
+        activeRepos: [],
+        metadata: {source: "dashboard-sync.sh"}
+      }')
+    curl -s -m 8 -X POST "$URL/api/ingest/state" \
+      -H "Authorization: Bearer $KEY" \
+      -H "Content-Type: application/json" \
+      -d "$STATE_PAYLOAD" > /dev/null 2>&1
+    log "state-sync: posted"
+  fi
 
   # --- Token metrics: extract usage data from JSONL and POST to /api/ingest/metrics ---
   for f in "$DIR"/*.jsonl; do
@@ -194,7 +259,7 @@ for line in sys.stdin:
     metrics.append({
         'inputTokens': inp,
         'outputTokens': out,
-        'model': model or 'kimi-coding/k2p5',
+        'model': model or os.environ.get('LLM_MODEL', 'unknown'),
         'channel': sid
     })
 if metrics:
