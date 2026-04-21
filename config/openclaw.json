@@ -24,8 +24,8 @@
         ]
       },
       "model": {
-        "primary": "__LLM_MODEL__",
-        "fallbacks": ["__LLM_MODEL__"]
+        "primary": "custom_proxy/gpt-4o-mini",
+        "fallbacks": []
       },
       "subagents": {
         "model": "__LLM_MODEL__",
@@ -64,6 +64,27 @@
     "mode": "merge",
     "providers": {
       "custom_proxy": {
+        "baseUrl": "https://api.tokenrouter.com/v1/chat/completions",
+        "apiKey": "${LLM_API_KEY}",
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "gpt-4o-mini",
+            "name": "GPT-4o Mini",
+            "reasoning": false,
+            "input": ["text"],
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0
+            },
+            "contextWindow": 128000,
+            "maxTokens": 8192
+          }
+        ]
+      },
+      "__LLM_PROVIDER__": {
         "baseUrl": "__LLM_BASE_URL__",
         "apiKey": "${LLM_API_KEY}",
         "models": [
