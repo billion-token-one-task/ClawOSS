@@ -28,7 +28,7 @@
         "fallbacks": []
       },
       "subagents": {
-        "model": "__LLM_MODEL__",
+        "model": "custom_proxy/gpt-4o-mini",
         "maxConcurrent": 14,
         "archiveAfterMinutes": 1440,
         "maxChildrenPerAgent": 15,
@@ -42,7 +42,7 @@
         "default": true,
         "name": "ClawOSS",
         "workspace": "__WORKSPACE_PATH__",
-        "model": "__LLM_MODEL__",
+        "model": "custom_proxy/gpt-4o-mini",
         "tools": {
           "profile": "coding"
         },
@@ -81,21 +81,6 @@
             },
             "contextWindow": 128000,
             "maxTokens": 8192
-          }
-        ]
-      },
-      "__LLM_PROVIDER__": {
-        "baseUrl": "__LLM_BASE_URL__",
-        "apiKey": "${LLM_API_KEY}",
-        "models": [
-          {
-            "id": "__LLM_MODEL_ID__",
-            "name": "__LLM_MODEL__",
-            "reasoning": false,
-            "input": ["text"],
-            "cost": { "input": "__LLM_INPUT_COST__", "output": "__LLM_OUTPUT_COST__" },
-            "contextWindow": "__LLM_CONTEXT_WINDOW__",
-            "maxTokens": "__LLM_MAX_TOKENS__"
           }
         ]
       }

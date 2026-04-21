@@ -169,9 +169,9 @@ if [ -n "${CLAW_API_KEY:-}" ]; then
     echo "[OK] Dashboard sync started"
 fi
 
-openclaw system event \
-    --text "ClawOSS Linux start. Execute HEARTBEAT.md steps 0-7. Fill all impl slots. NEVER idle." \
-    --mode now || echo "[WARN] Failed to dispatch initial system event"
+# openclaw system event \
+#     --text "ClawOSS Linux start. Execute HEARTBEAT.md steps 0-7. Fill all impl slots. NEVER idle." \
+#     --mode now || echo "[WARN] Failed to dispatch initial system event"
 
 echo "[OK] ClawOSS running. Gateway PID: $GATEWAY_PID"
 echo "  Model: ${LLM_MODEL}"
