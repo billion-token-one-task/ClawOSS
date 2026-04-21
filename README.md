@@ -48,6 +48,13 @@ bash scripts/setup.sh
 bash scripts/restart.sh
 ```
 
+### Deploy to Railway
+
+1. Fork this repo
+2. Create a new Railway project and connect your fork
+3. Add environment variables (see `.env.example` — at minimum: `LLM_MODEL`, `LLM_BASE_URL`, `LLM_API_KEY`, `GITHUB_TOKEN`)
+4. Railway auto-deploys via `Dockerfile` using `scripts/start-linux.sh`
+
 ---
 
 ## First Run Stats

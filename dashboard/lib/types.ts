@@ -204,6 +204,9 @@ export interface DashboardOverview {
     costPerMerge: number;
     tokensPerMerge: number;
     avgHoursToReview: number | null;
+    budgetUsd?: number | null;
+    budgetUsedPercent?: number | null;
+    activeModel?: string | null;
   };
   funnel: {
     submitted: number;

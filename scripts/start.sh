@@ -21,7 +21,7 @@ else
     echo "Registering agent '$AGENT_ID'..."
     openclaw agents add "$AGENT_ID" \
         --workspace "$WORKSPACE_DIR" \
-        --model "kimi-coding/k2p5" \
+        --model "${LLM_MODEL:-openai/gpt-4o-mini}" \
         --non-interactive
     echo "Agent '$AGENT_ID' registered"
 fi

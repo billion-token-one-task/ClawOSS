@@ -95,16 +95,24 @@ REPO_CONFIG_RESOLVED=$(sed \
     -e "s|__WORKSPACE_PATH__|$WORKSPACE_DIR|g" \
     -e "s|__PROJECT_DIR__|$PROJECT_DIR|g" \
     -e "s|__HOME_DIR__|$HOME|g" \
+    -e "s|__LLM_MODEL__|${LLM_MODEL:-openai/gpt-4o-mini}|g" \
+    -e "s|__LLM_BASE_URL__|${LLM_BASE_URL:-https://api.openai.com/v1}|g" \
+    -e "s|__LLM_PROVIDER__|$(echo "${LLM_MODEL:-openai/gpt-4o-mini}" | cut -d'/' -f1)|g" \
+    -e "s|__LLM_MODEL_ID__|$(echo "${LLM_MODEL:-openai/gpt-4o-mini}" | cut -d'/' -f2)|g" \
+    -e "s|__LLM_INPUT_COST__|$(echo "scale=9; ${LLM_INPUT_COST_PER_MILLION:-0.15} / 1000000" | bc)|g" \
+    -e "s|__LLM_OUTPUT_COST__|$(echo "scale=9; ${LLM_OUTPUT_COST_PER_MILLION:-0.60} / 1000000" | bc)|g" \
+    -e "s|__LLM_CONTEXT_WINDOW__|${LLM_CONTEXT_WINDOW:-128000}|g" \
+    -e "s|__LLM_MAX_TOKENS__|${LLM_MAX_TOKENS:-16384}|g" \
     "$PROJECT_DIR/config/openclaw.json")
 
 _REPO_CONFIG="$REPO_CONFIG_RESOLVED" \
 _DEPLOYED="$DEPLOYED_CONFIG" \
-_KIMI_KEY="${KIMI_API_KEY:-}" \
-_MINIMAX_KEY="${MINIMAX_API_KEY:-}" \
+_LLM_KEY="${LLM_API_KEY:-}" \
+_LLM_MODEL="${LLM_MODEL:-}" \
+_LLM_BASE_URL="${LLM_BASE_URL:-}" \
 _GH_TOKEN="${GITHUB_TOKEN:-}" \
 _DASH_URL="${DASHBOARD_URL:-https://clawoss-dashboard.vercel.app}" \
 _CLAW_KEY="${CLAW_API_KEY:-}" \
-_OPENROUTER_KEY="${OPENROUTER_API_KEY:-}" \
 python3 -c "
 import json, os
 
@@ -131,12 +139,12 @@ merged = deep_merge(deployed, repo_config)
 # Inject env vars (non-empty only)
 merged.setdefault('env', {})
 env_map = {
-    'KIMI_API_KEY': os.environ.get('_KIMI_KEY', ''),
-    'MINIMAX_API_KEY': os.environ.get('_MINIMAX_KEY', ''),
+    'LLM_API_KEY': os.environ.get('_LLM_KEY', ''),
+    'LLM_MODEL': os.environ.get('_LLM_MODEL', ''),
+    'LLM_BASE_URL': os.environ.get('_LLM_BASE_URL', ''),
     'GITHUB_TOKEN': os.environ.get('_GH_TOKEN', ''),
     'DASHBOARD_URL': os.environ.get('_DASH_URL', ''),
     'CLAW_API_KEY': os.environ.get('_CLAW_KEY', ''),
-    'OPENROUTER_API_KEY': os.environ.get('_OPENROUTER_KEY', ''),
 }
 for k, v in env_map.items():
     if v:
@@ -174,56 +182,48 @@ print('All cron jobs disabled (V10: no cron dependencies)')
     echo "[OK] Cron jobs disabled (V10: heartbeat + subagents handle everything)"
 fi
 
-# ── 6. Update gateway plist PATH (ensure python3, gh, jq are reachable) ─
-# The gateway spawns subagents that need these tools. launchd has a minimal
-# PATH so we inject the paths we need.
-if [ -f "$GATEWAY_PLIST" ]; then
-    # Get current PATH from plist
-    PLIST_PATH=$(/usr/libexec/PlistBuddy -c "Print :EnvironmentVariables:PATH" "$GATEWAY_PLIST" 2>/dev/null || echo "")
-    NEEDS_UPDATE=false
-
-    # Directories that must be in the plist PATH
-    REQUIRED_DIRS=()
-    for dir in "/opt/homebrew/bin" "/usr/local/bin" "/usr/bin" "/bin" "/usr/sbin" "/sbin"; do
-        if [ -d "$dir" ] && [[ ":$PLIST_PATH:" != *":$dir:"* ]]; then
-            REQUIRED_DIRS+=("$dir")
+# ── 6. Update gateway plist PATH (macOS only) ────────────────────────
+if [[ "$(uname)" == "Darwin" ]]; then
+    if [ -f "$GATEWAY_PLIST" ]; then
+        PLIST_PATH=$(/usr/libexec/PlistBuddy -c "Print :EnvironmentVariables:PATH" "$GATEWAY_PLIST" 2>/dev/null || echo "")
+        NEEDS_UPDATE=false
+        REQUIRED_DIRS=()
+        for dir in "/opt/homebrew/bin" "/usr/local/bin" "/usr/bin" "/bin" "/usr/sbin" "/sbin"; do
+            if [ -d "$dir" ] && [[ ":$PLIST_PATH:" != *":$dir:"* ]]; then
+                REQUIRED_DIRS+=("$dir")
+                NEEDS_UPDATE=true
+            fi
+        done
+        NVM_NODE_DIR="$(dirname "$(which node)" 2>/dev/null || echo "")"
+        if [ -n "$NVM_NODE_DIR" ] && [[ ":$PLIST_PATH:" != *":$NVM_NODE_DIR:"* ]]; then
+            REQUIRED_DIRS+=("$NVM_NODE_DIR")
             NEEDS_UPDATE=true
         fi
-    done
-
-    # Also add nvm node path if present
-    NVM_NODE_DIR="$(dirname "$(which node)" 2>/dev/null || echo "")"
-    if [ -n "$NVM_NODE_DIR" ] && [[ ":$PLIST_PATH:" != *":$NVM_NODE_DIR:"* ]]; then
-        REQUIRED_DIRS+=("$NVM_NODE_DIR")
-        NEEDS_UPDATE=true
-    fi
-
-    # Add gh path if not already included
-    GH_DIR="$(dirname "$(which gh)" 2>/dev/null || echo "")"
-    if [ -n "$GH_DIR" ] && [[ ":$PLIST_PATH:" != *":$GH_DIR:"* ]]; then
-        REQUIRED_DIRS+=("$GH_DIR")
-        NEEDS_UPDATE=true
-    fi
-
-    # Add ~/.local/bin (python -> python3 symlink lives here)
-    LOCAL_BIN="$HOME/.local/bin"
-    if [ -d "$LOCAL_BIN" ] && [[ ":$PLIST_PATH:" != *":$LOCAL_BIN:"* ]]; then
-        REQUIRED_DIRS+=("$LOCAL_BIN")
-        NEEDS_UPDATE=true
-    fi
-
-    if [ "$NEEDS_UPDATE" = true ] && [ -n "$PLIST_PATH" ]; then
-        NEW_PATH="$PLIST_PATH"
-        for dir in "${REQUIRED_DIRS[@]}"; do
-            NEW_PATH="$NEW_PATH:$dir"
-        done
-        /usr/libexec/PlistBuddy -c "Set :EnvironmentVariables:PATH $NEW_PATH" "$GATEWAY_PLIST" 2>/dev/null || true
-        echo "[OK] Gateway plist PATH updated (added: ${REQUIRED_DIRS[*]})"
+        GH_DIR="$(dirname "$(which gh)" 2>/dev/null || echo "")"
+        if [ -n "$GH_DIR" ] && [[ ":$PLIST_PATH:" != *":$GH_DIR:"* ]]; then
+            REQUIRED_DIRS+=("$GH_DIR")
+            NEEDS_UPDATE=true
+        fi
+        LOCAL_BIN="$HOME/.local/bin"
+        if [ -d "$LOCAL_BIN" ] && [[ ":$PLIST_PATH:" != *":$LOCAL_BIN:"* ]]; then
+            REQUIRED_DIRS+=("$LOCAL_BIN")
+            NEEDS_UPDATE=true
+        fi
+        if [ "$NEEDS_UPDATE" = true ] && [ -n "$PLIST_PATH" ]; then
+            NEW_PATH="$PLIST_PATH"
+            for dir in "${REQUIRED_DIRS[@]}"; do
+                NEW_PATH="$NEW_PATH:$dir"
+            done
+            /usr/libexec/PlistBuddy -c "Set :EnvironmentVariables:PATH $NEW_PATH" "$GATEWAY_PLIST" 2>/dev/null || true
+            echo "[OK] Gateway plist PATH updated (added: ${REQUIRED_DIRS[*]})"
+        else
+            echo "[OK] Gateway plist PATH already includes required dirs"
+        fi
     else
-        echo "[OK] Gateway plist PATH already includes required dirs"
+        echo "[INFO] No gateway plist found at $GATEWAY_PLIST — gateway install will create it"
     fi
 else
-    echo "[INFO] No gateway plist found at $GATEWAY_PLIST — gateway install will create it"
+    echo "[INFO] Linux detected — skipping launchd plist PATH update"
 fi
 
 # ── 7. Flush context & clean sessions ─────────────────────────────────
@@ -316,7 +316,7 @@ echo "[OK] Gateway stopped"
 
 # ── 13. Start gateway (prefer install for launchd, fallback to run) ───
 # `gateway install` creates/updates the launchd plist and loads it.
-# The plist has all env vars baked in (KIMI_API_KEY, GITHUB_TOKEN, etc.)
+# The plist has all env vars baked in (LLM_API_KEY, GITHUB_TOKEN, etc.)
 # `gateway run &` is a fallback that inherits the current shell env.
 if openclaw gateway install 2>/dev/null; then
     echo "[OK] Gateway installed via launchd"
@@ -354,22 +354,25 @@ else
     echo "[INFO] No dashboard-sync.sh found — skipping"
 fi
 
-# ── 15. PR ledger sync (launchd, runs every 60s) ─────────────────────
-LEDGER_PLIST="$HOME/Library/LaunchAgents/com.clawoss.pr-ledger-sync.plist"
-launchctl unload "$LEDGER_PLIST" 2>/dev/null || true
-
-if [ -f "$PROJECT_DIR/config/com.clawoss.pr-ledger-sync.plist" ]; then
-    sed \
-        -e "s|__PROJECT_DIR__|$PROJECT_DIR|g" \
-        -e "s|__HOME_DIR__|$HOME|g" \
-        "$PROJECT_DIR/config/com.clawoss.pr-ledger-sync.plist" > "$LEDGER_PLIST"
-    launchctl load "$LEDGER_PLIST" 2>/dev/null || true
-    echo "[OK] PR ledger sync installed (launchd, 60s interval)"
-elif [ -f "$LEDGER_PLIST" ]; then
-    launchctl load "$LEDGER_PLIST" 2>/dev/null || true
-    echo "[OK] PR ledger sync loaded (existing plist)"
+# ── 15. PR ledger sync (macOS launchd only) ──────────────────────────
+if [[ "$(uname)" == "Darwin" ]]; then
+    LEDGER_PLIST="$HOME/Library/LaunchAgents/com.clawoss.pr-ledger-sync.plist"
+    launchctl unload "$LEDGER_PLIST" 2>/dev/null || true
+    if [ -f "$PROJECT_DIR/config/com.clawoss.pr-ledger-sync.plist" ]; then
+        sed \
+            -e "s|__PROJECT_DIR__|$PROJECT_DIR|g" \
+            -e "s|__HOME_DIR__|$HOME|g" \
+            "$PROJECT_DIR/config/com.clawoss.pr-ledger-sync.plist" > "$LEDGER_PLIST"
+        launchctl load "$LEDGER_PLIST" 2>/dev/null || true
+        echo "[OK] PR ledger sync installed (launchd, 60s interval)"
+    elif [ -f "$LEDGER_PLIST" ]; then
+        launchctl load "$LEDGER_PLIST" 2>/dev/null || true
+        echo "[OK] PR ledger sync loaded (existing plist)"
+    else
+        echo "[INFO] No pr-ledger-sync plist found — skipping"
+    fi
 else
-    echo "[INFO] No pr-ledger-sync plist found — skipping"
+    echo "[INFO] Linux detected — skipping launchd PR ledger sync (use cron or dashboard-sync.sh)"
 fi
 
 # ── 15b. Ensure dual push remotes (CMLKevin + billion-token-one-task) ──
@@ -414,7 +417,7 @@ fi
 # ── Summary ───────────────────────────────────────────────────────────
 echo ""
 echo "=== ClawOSS V10 Running ==="
-echo "  Model: minimax/m2.7 (MiniMax M2.7, 204k context) + kimi-coding/k2p5 fallback"
+echo "  Model: ${LLM_MODEL:-openai/gpt-4o-mini} (${LLM_BASE_URL:-https://api.openai.com/v1})"
 echo "  Dashboard: https://clawoss-dashboard.vercel.app"
 echo "  Slots: 3 always-on (scout + PR monitor + PR analyst) + 10 impl/followup = 13"
 echo "  Heartbeat: 5m"

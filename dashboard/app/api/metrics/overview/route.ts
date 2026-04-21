@@ -206,6 +206,24 @@ export async function GET() {
     const totalTokensAllTime = (totalTokensResult[0]?.input || 0) + (totalTokensResult[0]?.output || 0);
     const tokensPerMerge = mergedPRs > 0 ? Math.round(totalTokensAllTime / mergedPRs) : 0;
 
+    const budgetUsd = process.env.TOKEN_BUDGET_USD
+      ? parseFloat(process.env.TOKEN_BUDGET_USD)
+      : null;
+    const budgetUsedPercent =
+      budgetUsd && budgetUsd > 0
+        ? Math.round((totalCostAllTime / budgetUsd) * 100)
+        : null;
+
+    // Read active model from latest heartbeat metadata (set by dashboard-sync.sh from LLM_MODEL env on Railway)
+    const activeModel = (() => {
+      try {
+        const meta = hb?.metadata;
+        if (!meta) return null;
+        const parsed = typeof meta === "string" ? JSON.parse(meta) : meta;
+        return (parsed as Record<string, unknown>)?.model as string | null ?? null;
+      } catch { return null; }
+    })();
+
     return NextResponse.json({
       agentStatus: {
         isOnline,
@@ -229,6 +247,9 @@ export async function GET() {
         costPerMerge,
         tokensPerMerge,
         avgHoursToReview,
+        budgetUsd,
+        budgetUsedPercent,
+        activeModel,
       },
       funnel: {
         submitted: totalPRs,

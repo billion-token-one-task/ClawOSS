@@ -1,25 +1,29 @@
-# ClawOSS — Claude Code Instructions
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## What This Is
 ClawOSS is an autonomous OpenClaw agent configuration that discovers GitHub issues, implements bug fixes, and submits PRs. It does NOT modify OpenClaw itself — it uses OpenClaw as a platform.
 
 ## Architecture
 - **Orchestrator**: Main agent session running HEARTBEAT.md loop (steps 0-7)
-- **Implementation sub-agents**: Fresh context per task, clone → reproduce → fix → test → PR
-- **Follow-up sub-agents**: 1 per PR, handle reviewer feedback via `gh` CLI, max 3 rounds
-- **Sub-agents share a 5-slot pool** — follow-ups get priority over new implementations
+- **Always-on sub-agents (4 slots)**: `scout` (issue discovery), `pr-monitor-scan` (fast PR scanning), `pr-monitor-deep` (comment analysis), `pr-analyst` (portfolio strategy) — respawn IMMEDIATELY if dead
+- **Implementation sub-agents (10 slots)**: Fresh context per task, clone → reproduce → fix → test → PR
+- **Total maxConcurrent: 14** — 4 always-on + 10 impl/followup
 - **Result files**: Sub-agents write to `workspace/memory/subagent-result-*.md`, orchestrator reads and processes
+- **Templates**: `workspace/templates/subagent-*.md` — ALWAYS read from disk before spawning (never use cached content)
 
 ## Key Files
 - `workspace/HEARTBEAT.md` — The autonomous loop, DO NOT break this
 - `workspace/AGENTS.md` — Operating instructions and rules
-- `workspace/skills/*/SKILL.md` — 10+ custom skills
+- `workspace/skills/*/SKILL.md` — 16 custom skills (see Skills section in README)
+- `workspace/templates/` — Sub-agent task templates, read fresh before each spawn
 - `config/openclaw.json` — Agent config (NO secrets here)
 - `~/.openclaw/openclaw.json` — Live config WITH secrets
-- `~/Library/LaunchAgents/ai.openclaw.gateway.plist` — Gateway service (MUST include KIMI_API_KEY)
+- `~/Library/LaunchAgents/ai.openclaw.gateway.plist` — Gateway service
 - `workspace/memory/` — Runtime state (gitignored)
-- `dashboard/` — Next.js 15 Vercel dashboard
-- `scripts/restart.sh` — Full restart for headless operation
+- `dashboard/` — Next.js 15 + Turso dashboard (deployed to Vercel)
+- `scripts/restart.sh` — Full 13-step restart for headless operation
 
 ## Critical Rules
 - NEVER put secrets in `config/openclaw.json` — that's committed to git
@@ -32,6 +36,7 @@ ClawOSS is an autonomous OpenClaw agent configuration that discovers GitHub issu
 - Sub-agents must deeply understand repo architecture before implementing fixes
 - All GitHub communication via `gh` CLI
 - Branch naming: `clawoss/{fix,docs,test,typo}/<description>`
+- GitHub author is always `BillionClaw` — never use `@me`
 
 ## Team (clawoss-v7)
 - **clawoss-architect**: Architecture & prompt design, deep knowledge of all files
@@ -60,14 +65,14 @@ The quality of ClawOSS output is 100% determined by its prompts. When strategy c
 
 ## Model
 - MiniMax M2.7 via direct API (`https://api.minimaxi.com/v1`)
-- 204k context window, 131k max output
+- 204k context window, 131k max output; cost: $0.50/M input, $1.50/M output
 - Fallback: Kimi Code k2p5
 - API key env var: `MINIMAX_API_KEY`
 
 ## Common Commands
 ```bash
 # Restart agent
-cd /Users/kevinlin/clawOSS && bash scripts/restart.sh
+cd /Users/ShaochenMa/Workspace/ClawOSS && bash scripts/restart.sh
 
 # Check agent status
 openclaw logs 2>&1 | tail -20
@@ -81,4 +86,16 @@ launchctl load ~/Library/LaunchAgents/ai.openclaw.gateway.plist
 
 # Check PRs
 gh pr list --author BillionClaw --state open
+
+# Dashboard development (from dashboard/)
+cd dashboard && npm run dev      # start dev server
+cd dashboard && npm run build    # build for Vercel
+cd dashboard && npx drizzle-kit migrate  # run DB migrations (requires TURSO_DATABASE_URL + TURSO_AUTH_TOKEN)
 ```
+
+## Dashboard Architecture
+The `dashboard/` directory is a Next.js 15 app deployed to Vercel.
+- **DB**: Turso (libsql) + Drizzle ORM — schema at `dashboard/lib/schema.ts`, migrations at `dashboard/drizzle/migrations/`
+- **API routes**: `dashboard/app/api/ingest/*` (heartbeat, metrics, conversation, state, logs), `dashboard/app/api/agent/*`
+- **UI**: React 19, Tailwind 4, shadcn/ui, Recharts for charts, SWR for data fetching
+- **Env vars needed**: `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `OPENCLAW_API_KEY` (for ingest auth)
