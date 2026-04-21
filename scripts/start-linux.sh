@@ -12,6 +12,8 @@ DEPLOYED_CONFIG="$HOME/.openclaw/openclaw.json"
 : "${LLM_MODEL:?LLM_MODEL is required}"
 : "${LLM_BASE_URL:?LLM_BASE_URL is required}"
 : "${GITHUB_TOKEN:?GITHUB_TOKEN is required}"
+# gh CLI uses GH_TOKEN; export alias so no interactive login is needed
+export GH_TOKEN="$GITHUB_TOKEN"
 
 GITHUB_USERNAME="${GITHUB_USERNAME:-BillionClaw}"
 GITHUB_EMAIL="${GITHUB_EMAIL:-267901332+BillionClaw@users.noreply.github.com}"
