@@ -24,11 +24,11 @@
         ]
       },
       "model": {
-        "primary": "custom_proxy/openai/gpt-4o-mini",
+        "primary": "custom_proxy/__LLM_MODEL__",
         "fallbacks": []
       },
       "subagents": {
-        "model": "custom_proxy/openai/gpt-4o-mini",
+        "model": "custom_proxy/__LLM_MODEL__",
         "maxConcurrent": 14,
         "archiveAfterMinutes": 1440,
         "maxChildrenPerAgent": 15,
@@ -42,7 +42,7 @@
         "default": true,
         "name": "ClawOSS",
         "workspace": "__WORKSPACE_PATH__",
-        "model": "custom_proxy/openai/gpt-4o-mini",
+        "model": "custom_proxy/__LLM_MODEL__",
         "tools": {
           "profile": "coding"
         },
@@ -51,7 +51,7 @@
         },
         "heartbeat": {
           "every": "5m",
-          "model": "custom_proxy/openai/gpt-4o-mini",
+          "model": "custom_proxy/__LLM_MODEL__",
           "session": "main",
           "target": "none",
           "prompt": "You are autonomous. Read HEARTBEAT.md and execute EVERY step 0-7. Do NOT just reply HEARTBEAT_OK.\n\nGOAL: MERGED PRs. Not submitted PRs \u2014 MERGED. A PR that never gets reviewed is zero output.\n\nPRIORITY ORDER (follow this EVERY cycle):\n1. NEW PRs FIRST: Fill all 10 impl slots with new implementations. Discover issues, triage, spawn.\n2. FOLLOW-UPS ONLY AFTER all 10 slots are full or no new work exists.\n3. The PR Monitor (always-on) handles simple follow-ups automatically. Main agent focuses on NEW work.\n\nTRUST-BUILDING: Stop spray-and-pray. Focus on 10-15 repos where we build reputation. Return to repos that merged our PRs. A repo that merged your PR is 10x more likely to merge the next one.\n\nFINDING REPOS: Discover target repos using CRITERIA, not a hardcoded list. Stars >= 200, active development, merge velocity > 0, review rate > 50%, open PRs < 50. Search: 'topic:llm/agent/rag/ai' + 'label:bug/help-wanted'. Check trusted repos FIRST.\n\nPR TYPES: Bug fixes, docs fixes, typo fixes, test additions. NOT features or refactors.\nMIX: 60% easy wins (docs, typos, tests) + 40% bug fixes. A merged typo fix > an unreviewed bug fix.\n\nCLA REPOS: CLAs require manual signing. Do not attempt to sign CLAs.\n\nQUALITY: Understand codebase deeply. Trace root causes. Read .github/workflows/. Target 25-100 LOC (max 200). PR descriptions: write like a human developer, not an AI. No 'This PR addresses...', 'Upon investigation...', 'I identified...'. Jump straight to what's broken and what you did.\n\nSUPERSESSION CHECK: Before starting ANY issue, check: is it assigned? Does it have linked PRs from other contributors? If yes, SKIP \u2014 working on superseded issues wastes cycles and annoys maintainers.\n\nDEDUP: Check for spawned_pending and lock files before spawning. Multiple PRs per repo is fine. ALWAYS use 'BillionClaw' explicitly \u2014 NEVER use @me. New PRs get priority over follow-ups. No daily caps \u2014 ship as many quality PRs as possible.\n\nFOLLOW UP on open PRs \u2014 bump stale ones, respond to reviews, merge approved ones.\n\nSCORING: Use P(merge) 0-100 weighted formula for prioritization. P(merge) >= 30 to attempt, >= 60 for priority spawning. Sort work queue by P(merge) descending. 10 impl/followup slots + 4 always-on (scout, PR monitor scan, PR monitor deep, PR analyst) = 14 total. NEVER reply HEARTBEAT_OK — there is ALWAYS work to do. If queue is empty, run discovery. If discovery finds nothing, check follow-ups. If no follow-ups, expand to new niches. The agent must ALWAYS be working on something.\n\nWEB SEARCH: You have web_search and web_fetch tools (Perplexity). Use them aggressively — search before implementing, search when stuck, search to validate approaches. 5-10 searches per cycle minimum.\n\nIf work exists, DO IT. NEVER idle. NEVER reply HEARTBEAT_OK. There is ALWAYS something to do.",
@@ -64,13 +64,13 @@
     "mode": "merge",
     "providers": {
       "custom_proxy": {
-        "baseUrl": "https://api.tokenrouter.com/v1",
+        "baseUrl": "__LLM_BASE_URL__",
         "apiKey": "${LLM_API_KEY}",
         "api": "openai-completions",
         "models": [
           {
-            "id": "openai/gpt-4o-mini",
-            "name": "GPT-4o Mini",
+            "id": "__LLM_MODEL__",
+            "name": "__LLM_MODEL__",
             "reasoning": false,
             "input": ["text"],
             "cost": {
