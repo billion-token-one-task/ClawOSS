@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { db, ensureDb } from "@/lib/db";
 import { heartbeats, agentLogs } from "@/lib/schema";
 import { desc, gte, eq, and, sql } from "drizzle-orm";
+import { extractRuntimeSnapshot } from "@/lib/runtime";
 
 export async function GET() {
   try {
@@ -19,6 +20,7 @@ export async function GET() {
       .limit(200);
 
     const latestBeat = recentHeartbeats[0];
+    const runtime = extractRuntimeSnapshot(latestBeat?.metadata);
     let streak = 0;
     for (const beat of recentHeartbeats) {
       if (beat.status === "alive") streak++;
@@ -31,7 +33,7 @@ export async function GET() {
     const uptimePercentage = totalBeats > 0 ? (aliveBeats / totalBeats) * 100 : 0;
     const firstBeat = recentHeartbeats[recentHeartbeats.length - 1];
     const offlineBeats = totalBeats - aliveBeats;
-    const downtimeMinutes = offlineBeats * 5; // assuming 5 min intervals
+    const downtimeMinutes = offlineBeats * runtime.heartbeatIntervalMinutes;
 
     // Error rate
     const recentErrors = await db
@@ -68,7 +70,7 @@ export async function GET() {
     return NextResponse.json({
       heartbeat: {
         lastBeat: latestBeat?.timestamp || null,
-        intervalMinutes: 5,
+        intervalMinutes: runtime.heartbeatIntervalMinutes,
         streak,
       },
       uptime: {

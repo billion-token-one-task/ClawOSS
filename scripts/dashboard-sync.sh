@@ -13,6 +13,14 @@
 
 URL="${DASHBOARD_URL:-https://clawoss-dashboard.vercel.app}"
 KEY="${CLAW_API_KEY:?Set CLAW_API_KEY env var}"
+PRIMARY_MODEL="${CLAWOSS_PRIMARY_MODEL:-unknown/unknown}"
+PRIMARY_MODEL_NAME="${CLAWOSS_PRIMARY_MODEL_NAME:-$PRIMARY_MODEL}"
+PRIMARY_PROVIDER="${CLAWOSS_PRIMARY_PROVIDER:-${PRIMARY_MODEL%%/*}}"
+PRIMARY_INPUT_COST_PER_MTOKENS="${CLAWOSS_PRIMARY_INPUT_COST_PER_MTOKENS:-0}"
+PRIMARY_OUTPUT_COST_PER_MTOKENS="${CLAWOSS_PRIMARY_OUTPUT_COST_PER_MTOKENS:-0}"
+HEARTBEAT_INTERVAL_MINUTES="${CLAWOSS_HEARTBEAT_INTERVAL_MINUTES:-5}"
+TOKEN_BUDGET_TOTAL="${CLAWOSS_TOKEN_BUDGET_TOTAL:-}"
+COST_BUDGET_USD_TOTAL="${CLAWOSS_COST_BUDGET_USD_TOTAL:-}"
 # Sessions dir: check for the clawoss agent sessions, with fallback
 if [ -d "$HOME/.openclaw/agents/clawoss/sessions" ]; then
   DIR="$HOME/.openclaw/agents/clawoss/sessions"
@@ -23,7 +31,7 @@ else
 fi
 INTERVAL=10
 # Use persistent offset dir under workspace to survive reboots (not /tmp)
-SYNC_STATE_DIR="${CLAWOSS_WORKSPACE:-$HOME/clawOSS/workspace}/.sync-state"
+SYNC_STATE_DIR="${CLAWOSS_WORKSPACE_DIR:-${CLAWOSS_WORKSPACE:-$HOME/clawOSS/workspace}}/.sync-state"
 OFFSET_DIR="${SYNC_STATE_DIR}/offsets"
 SESSION_MAP="${SYNC_STATE_DIR}/session-map.json"
 LOCK_FILE="${SYNC_STATE_DIR}/dashboard-sync.pid"
@@ -31,6 +39,14 @@ SCRIPT_PATH="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 mkdir -p "$OFFSET_DIR" "$SYNC_STATE_DIR"
 
 log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*"; }
+
+json_number_or_null() {
+  if [ -n "${1:-}" ]; then
+    printf '%s' "$1"
+  else
+    printf 'null'
+  fi
+}
 
 # --- PID lock: prevent duplicate instances ---
 if [ -f "$LOCK_FILE" ]; then
@@ -131,7 +147,15 @@ while true; do
     --argjson active "$LOCKS" \
     --argjson totalBytes "${BYTES:-0}" \
     --arg source "dashboard-sync.sh" \
-    '{sessionCount:$sessions, activeCount:$active, totalBytes:$totalBytes, source:$source}' 2>/dev/null || echo '{}')
+    --arg model "$PRIMARY_MODEL" \
+    --arg modelName "$PRIMARY_MODEL_NAME" \
+    --arg provider "$PRIMARY_PROVIDER" \
+    --argjson heartbeatIntervalMinutes "$(json_number_or_null "$HEARTBEAT_INTERVAL_MINUTES")" \
+    --argjson inputUsdPerMillionTokens "$(json_number_or_null "$PRIMARY_INPUT_COST_PER_MTOKENS")" \
+    --argjson outputUsdPerMillionTokens "$(json_number_or_null "$PRIMARY_OUTPUT_COST_PER_MTOKENS")" \
+    --argjson tokenBudgetTotal "$(json_number_or_null "$TOKEN_BUDGET_TOTAL")" \
+    --argjson costBudgetUsdTotal "$(json_number_or_null "$COST_BUDGET_USD_TOTAL")" \
+    '{sessionCount:$sessions, activeCount:$active, totalBytes:$totalBytes, source:$source, model:$model, modelName:$modelName, provider:$provider, runtime:{primaryModel:$model, primaryModelName:$modelName, primaryProvider:$provider, heartbeatIntervalMinutes:$heartbeatIntervalMinutes, pricing:{inputUsdPerMillionTokens:$inputUsdPerMillionTokens, outputUsdPerMillionTokens:$outputUsdPerMillionTokens}, budget:{tokenBudgetTotal:$tokenBudgetTotal, costBudgetUsdTotal:$costBudgetUsdTotal}}}' 2>/dev/null || echo '{}')
 
   curl -s -m 8 -X POST "$URL/api/ingest/heartbeat" \
     -H "Authorization: Bearer $KEY" \
@@ -166,9 +190,13 @@ while true; do
     NEW_COUNT=$((TOTAL_LINES - TOKEN_PREV))
     [ "$NEW_COUNT" -gt 200 ] && NEW_COUNT=200 && TOKEN_PREV=$((TOTAL_LINES - 200))
 
-    METRICS_PAYLOAD=$(tail -n "$NEW_COUNT" "$f" 2>/dev/null | _SID="$SID" python3 -c "
+    METRICS_PAYLOAD=$(tail -n "$NEW_COUNT" "$f" 2>/dev/null | _SID="$SID" _DEFAULT_MODEL="$PRIMARY_MODEL" _PRIMARY_PROVIDER="$PRIMARY_PROVIDER" _INPUT_PRICE="$PRIMARY_INPUT_COST_PER_MTOKENS" _OUTPUT_PRICE="$PRIMARY_OUTPUT_COST_PER_MTOKENS" python3 -c "
 import json, sys, os
 sid = os.environ['_SID']
+default_model = os.environ.get('_DEFAULT_MODEL', '')
+provider = os.environ.get('_PRIMARY_PROVIDER', '')
+input_price = float(os.environ.get('_INPUT_PRICE', '0') or 0)
+output_price = float(os.environ.get('_OUTPUT_PRICE', '0') or 0)
 metrics = []
 for line in sys.stdin:
     line = line.strip()
@@ -190,12 +218,17 @@ for line in sys.stdin:
     out = usage.get('output', 0) or usage.get('output_tokens', 0) or usage.get('outputTokens', 0) or 0
     if inp == 0 and out == 0:
         continue
-    model = m.get('model', e.get('model', ''))
+    model = m.get('model', e.get('model', '')) or default_model
+    cost = 0
+    if model == default_model and (input_price > 0 or output_price > 0):
+        cost = round((inp * input_price + out * output_price) / 1_000_000, 6)
     metrics.append({
         'inputTokens': inp,
         'outputTokens': out,
-        'model': model or 'kimi-coding/k2p5',
-        'channel': sid
+        'model': model,
+        'provider': provider,
+        'costUsd': cost,
+        'channel': f'jsonl:{sid}'
     })
 if metrics:
     print(json.dumps({'metrics': metrics}))

@@ -4,6 +4,8 @@ import { NextResponse } from "next/server";
 import { db, ensureDb } from "@/lib/db";
 import { heartbeats, pullRequests, prReviews, metricsTokens, agentLogs, conversationMessages, subagentRuns } from "@/lib/schema";
 import { desc, gte, sql, eq } from "drizzle-orm";
+import { preferAccurateMetrics } from "@/lib/metrics-source";
+import { computeBudgetStatus, extractRuntimeSnapshot } from "@/lib/runtime";
 
 export async function GET() {
   try {
@@ -20,6 +22,7 @@ export async function GET() {
       .limit(1);
 
     const hb = latestHeartbeat[0];
+    const runtime = extractRuntimeSnapshot(hb?.metadata);
     const isOnline = hb
       ? hb.timestamp.getTime() > fiveMinutesAgo.getTime()
       : false;
@@ -78,19 +81,28 @@ export async function GET() {
     }
 
     // Today's token usage and cost from metrics_tokens table
-    const todayMetrics = await db
-      .select({
-        totalInput: sql<number>`COALESCE(SUM(input_tokens), 0)`,
-        totalOutput: sql<number>`COALESCE(SUM(output_tokens), 0)`,
-        totalCost: sql<number>`COALESCE(SUM(cost_usd), 0)`,
-      })
-      .from(metricsTokens)
-      .where(gte(metricsTokens.timestamp, todayStart));
+    const todayMetricRows = preferAccurateMetrics(
+      await db
+        .select()
+        .from(metricsTokens)
+        .where(gte(metricsTokens.timestamp, todayStart))
+        .orderBy(desc(metricsTokens.timestamp))
+    );
 
-    let inputTokensToday = todayMetrics[0]?.totalInput || 0;
-    let outputTokensToday = todayMetrics[0]?.totalOutput || 0;
+    let inputTokensToday = todayMetricRows.reduce(
+      (sum, metric) => sum + (metric.inputTokens || 0),
+      0
+    );
+    let outputTokensToday = todayMetricRows.reduce(
+      (sum, metric) => sum + (metric.outputTokens || 0),
+      0
+    );
     let tokensUsedToday = inputTokensToday + outputTokensToday;
-    let costToday = todayMetrics[0]?.totalCost || 0;
+    let costToday =
+      Math.round(
+        todayMetricRows.reduce((sum, metric) => sum + (metric.costUsd || 0), 0) *
+          1_000_000
+      ) / 1_000_000;
 
     // Fallback: estimate from conversation messages if metrics_tokens is empty
     if (tokensUsedToday === 0) {
@@ -108,9 +120,12 @@ export async function GET() {
       // Estimate 70/30 input/output split for fallback
       inputTokensToday = Math.round(tokensUsedToday * 0.7);
       outputTokensToday = tokensUsedToday - inputTokensToday;
-      // Estimate cost using Kimi K2.5 average ($1.8/M tokens)
+      const averageCostPerMillionTokens =
+        ((runtime.pricing.inputUsdPerMillionTokens ?? 0) +
+          (runtime.pricing.outputUsdPerMillionTokens ?? 0)) /
+        2;
       if (tokensUsedToday > 0 && costToday === 0) {
-        costToday = tokensUsedToday * (1.8 / 1_000_000);
+        costToday = tokensUsedToday * (averageCostPerMillionTokens / 1_000_000);
       }
     }
 
@@ -189,31 +204,45 @@ export async function GET() {
       // No reviews yet
     }
 
-    // Total cost for cost-per-merge calculation
-    const totalCostResult = await db
-      .select({ total: sql<number>`COALESCE(SUM(cost_usd), 0)` })
-      .from(metricsTokens);
-    const totalCostAllTime = totalCostResult[0]?.total || 0;
+    const totalMetricRows = preferAccurateMetrics(
+      await db.select().from(metricsTokens).orderBy(desc(metricsTokens.timestamp))
+    );
+    const totalInputAllTime = totalMetricRows.reduce(
+      (sum, metric) => sum + (metric.inputTokens || 0),
+      0
+    );
+    const totalOutputAllTime = totalMetricRows.reduce(
+      (sum, metric) => sum + (metric.outputTokens || 0),
+      0
+    );
+    const totalCostAllTime =
+      Math.round(
+        totalMetricRows.reduce((sum, metric) => sum + (metric.costUsd || 0), 0) *
+          1_000_000
+      ) / 1_000_000;
     const costPerMerge = mergedPRs > 0 ? totalCostAllTime / mergedPRs : 0;
 
     // Total tokens for cost-per-merge
-    const totalTokensResult = await db
-      .select({
-        input: sql<number>`COALESCE(SUM(input_tokens), 0)`,
-        output: sql<number>`COALESCE(SUM(output_tokens), 0)`,
-      })
-      .from(metricsTokens);
-    const totalTokensAllTime = (totalTokensResult[0]?.input || 0) + (totalTokensResult[0]?.output || 0);
+    const totalTokensAllTime = totalInputAllTime + totalOutputAllTime;
     const tokensPerMerge = mergedPRs > 0 ? Math.round(totalTokensAllTime / mergedPRs) : 0;
+    const budget = computeBudgetStatus(runtime, {
+      inputTokens: totalInputAllTime,
+      outputTokens: totalOutputAllTime,
+      costUsd: totalCostAllTime,
+    });
 
     return NextResponse.json({
       agentStatus: {
         isOnline,
+        isPaused: budget.paused,
+        pauseReason: budget.pauseReason,
         lastHeartbeat: hb?.timestamp || new Date(0),
-        currentTask: hb?.currentTask || null,
+        currentTask: budget.paused ? budget.pauseReason : hb?.currentTask || null,
         uptimeSeconds: hb?.uptimeSeconds || 0,
         heartbeatStreak: streak,
       },
+      runtime,
+      budget,
       stats: {
         totalPRs,
         mergedPRs,

@@ -60,7 +60,7 @@ export const COST_MODELS: Record<string, CostModel> = {
   },
 };
 
-// Default model for the ClawOSS agent (switched to MiniMax M2.7 direct API)
+// Default fallback model only. Real runtime pricing should come from telemetry metadata.
 export const DEFAULT_MODEL = "minimax/MiniMax-M2.7";
 export const DEFAULT_COST_MODEL = COST_MODELS[DEFAULT_MODEL];
 
@@ -73,7 +73,8 @@ export function computeTokenCost(
   outputTokens: number,
   model?: string
 ): number {
-  const costModel = (model && COST_MODELS[model]) || DEFAULT_COST_MODEL;
+  const costModel = model ? COST_MODELS[model] : DEFAULT_COST_MODEL;
+  if (!costModel) return 0;
   return (
     inputTokens * costModel.inputCostPerToken +
     outputTokens * costModel.outputCostPerToken

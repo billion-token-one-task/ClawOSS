@@ -4,7 +4,7 @@ set -euo pipefail
 # pr-ledger-sync.sh — Keeps workspace/memory/pr-ledger.md in sync with GitHub
 #
 # Two data sources:
-#   1. GitHub API: all PRs authored by BillionClaw (authoritative for status)
+#   1. GitHub API: all PRs authored by the configured agent identity (authoritative for status)
 #   2. Subagent result files: picks up PRs before GitHub search indexes them
 #
 # Can run standalone or be called from dashboard-sync.sh every ~60s.
@@ -14,7 +14,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 LEDGER="$PROJECT_DIR/workspace/memory/pr-ledger.md"
 RESULT_DIR="$PROJECT_DIR/workspace/memory"
-AGENT_USER="${CLAW_AGENT_USERNAME:-BillionClaw}"
+AGENT_USER="${CLAW_AGENT_USERNAME:-${GITHUB_USERNAME:-clawoss-agent}}"
 
 log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] pr-ledger-sync: $*"; }
 

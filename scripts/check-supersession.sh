@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# check-supersession.sh — Check if someone else is already working on an issue
+# check-supersession.sh 鈥?Check if someone else is already working on an issue
 # Usage: check-supersession.sh <owner/repo> <issue_number>
 # Exit 0 = clear, Exit 1 = superseded
 
 REPO="${1:?Usage: check-supersession.sh <owner/repo> <issue_number>}"
 ISSUE="${2:?Usage: check-supersession.sh <owner/repo> <issue_number>}"
+AGENT_USER="${CLAW_AGENT_USERNAME:-${GITHUB_USERNAME:-clawoss-agent}}"
 
 # 1. Linked open PRs
 LINKED=$(gh api "repos/${REPO}/issues/${ISSUE}/timeline" --jq '[.[] | select(.event=="cross-referenced") | .source.issue | select(.pull_request != null and .state == "open")] | length' 2>/dev/null || echo 0)
@@ -34,7 +35,7 @@ if [ "$CLAIMED" -gt 0 ]; then
 fi
 
 # 4. Competing open PRs
-COMPETING=$(gh pr list --repo "$REPO" --state open --search "$ISSUE" --json number,author --jq '[.[] | select(.author.login != "BillionClaw")] | length' 2>/dev/null || echo 0)
+COMPETING=$(gh pr list --repo "$REPO" --state open --search "$ISSUE" --json number,author --jq "[.[] | select(.author.login != \"$AGENT_USER\")] | length" 2>/dev/null || echo 0)
 [[ "$COMPETING" =~ ^[0-9]+$ ]] || COMPETING=0
 if [ "$COMPETING" -gt 0 ]; then
   echo "{\"superseded\": true, \"repo\": \"$REPO\", \"issue\": $ISSUE, \"reason\": \"${COMPETING} competing PR(s)\"}"

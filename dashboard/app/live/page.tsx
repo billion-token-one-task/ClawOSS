@@ -59,6 +59,15 @@ export default function LivePage() {
   const errorsLastHour = connectionData?.pipeline?.errorsLastHour || 0;
   const heartbeatsLastHour = connectionData?.pipeline?.heartbeatsLastHour || 0;
   const connectionState = connectionData?.connection?.state || "unknown";
+  const runtimeLabel =
+    connectionData?.runtime?.primaryModelName ||
+    connectionData?.runtime?.primaryModel ||
+    "llm-unset";
+  const pricingLabel =
+    connectionData?.runtime?.pricing?.inputUsdPerMillionTokens != null ||
+    connectionData?.runtime?.pricing?.outputUsdPerMillionTokens != null
+      ? `$${(connectionData?.runtime?.pricing?.inputUsdPerMillionTokens ?? 0).toFixed(2)}/$${(connectionData?.runtime?.pricing?.outputUsdPerMillionTokens ?? 0).toFixed(2)}/M`
+      : "n/a";
 
   const activeSession = selectedSession
     ? sessions.find((s) => s.sessionId === selectedSession)
@@ -156,6 +165,14 @@ export default function LivePage() {
         isConnected={isConnected}
         lastHeartbeat={lastHeartbeat}
         errorsLastHour={errorsLastHour}
+        inputCostPerToken={
+          (connectionData?.runtime?.pricing?.inputUsdPerMillionTokens ?? 0) /
+          1_000_000
+        }
+        outputCostPerToken={
+          (connectionData?.runtime?.pricing?.outputUsdPerMillionTokens ?? 0) /
+          1_000_000
+        }
       />
 
       {/* Session tabs - prominent horizontal tab bar */}
@@ -317,6 +334,12 @@ export default function LivePage() {
                 heartbeatsLastHour={heartbeatsLastHour}
                 errorsLastHour={errorsLastHour}
                 sessions={sessions}
+                runtimeLabel={runtimeLabel}
+                pricingLabel={pricingLabel}
+                heartbeatIntervalMinutes={
+                  connectionData?.runtime?.heartbeatIntervalMinutes || 5
+                }
+                budgetPaused={connectionData?.budget?.paused || false}
               />
             ) : (
               <>

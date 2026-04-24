@@ -5,6 +5,7 @@ import { db, ensureDb } from "@/lib/db";
 import { metricsTokens } from "@/lib/schema";
 import { gte, desc } from "drizzle-orm";
 import { format, subDays, subWeeks, subMonths } from "date-fns";
+import { preferAccurateMetrics } from "@/lib/metrics-source";
 
 export async function GET(request: Request) {
   try {
@@ -24,11 +25,13 @@ export async function GET(request: Request) {
         since = subWeeks(new Date(), 1);
     }
 
-    const metrics = await db
+    const metrics = preferAccurateMetrics(
+      await db
       .select()
       .from(metricsTokens)
       .where(gte(metricsTokens.timestamp, since))
-      .orderBy(desc(metricsTokens.timestamp));
+      .orderBy(desc(metricsTokens.timestamp))
+    );
 
     // Group by day
     const grouped = new Map<string, { inputTokens: number; outputTokens: number }>();

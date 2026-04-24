@@ -14,6 +14,30 @@ interface ConnectionStatus {
     errorsLastHour: number;
     lastMetricAt: string | null;
   };
+  runtime: {
+    primaryModel: string | null;
+    primaryModelName: string | null;
+    primaryProvider: string | null;
+    fallbackModels: string[];
+    heartbeatIntervalMinutes: number;
+    pricing: {
+      inputUsdPerMillionTokens: number | null;
+      outputUsdPerMillionTokens: number | null;
+    };
+  };
+  budget: {
+    tokenBudgetTotal: number | null;
+    costBudgetUsdTotal: number | null;
+    usedTokensTotal: number;
+    usedCostTotalUsd: number;
+    remainingTokens: number | null;
+    remainingCostUsd: number | null;
+    tokenUsagePercent: number | null;
+    costUsagePercent: number | null;
+    exhausted: boolean;
+    paused: boolean;
+    pauseReason: string | null;
+  };
   hasAnyData: boolean;
 }
 

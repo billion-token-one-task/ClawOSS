@@ -89,6 +89,22 @@ export default function OverviewPage() {
   const { data, isLoading } = useAgentStatus();
   const { data: connectionData } = useConnectionStatus();
   const { data: stateData, isLoading: stateLoading } = useAgentState();
+  const tokenBudgetPercent = data?.budget?.tokenUsagePercent ?? null;
+  const costBudgetPercent = data?.budget?.costUsagePercent ?? null;
+  const runtimeLabel =
+    data?.runtime?.primaryModelName || data?.runtime?.primaryModel || "llm-unset";
+  const pricingLabel =
+    data?.runtime?.pricing?.inputUsdPerMillionTokens != null ||
+    data?.runtime?.pricing?.outputUsdPerMillionTokens != null
+      ? `$${(data?.runtime?.pricing?.inputUsdPerMillionTokens ?? 0).toFixed(2)}/$${(data?.runtime?.pricing?.outputUsdPerMillionTokens ?? 0).toFixed(2)}/M`
+      : "n/a";
+  const budgetLabel = data?.budget?.paused
+    ? "paused"
+    : tokenBudgetPercent != null
+      ? `${tokenBudgetPercent.toFixed(1)}%`
+      : costBudgetPercent != null
+        ? `${costBudgetPercent.toFixed(1)}%`
+        : "--";
 
   const hasData = connectionData?.hasAnyData ||
     (data?.stats && (data.stats.totalPRs > 0 || data.stats.inputTokensToday > 0 || data.stats.outputTokensToday > 0)) ||
@@ -126,7 +142,7 @@ export default function OverviewPage() {
             </span>
           </div>
           <div className="flex items-center gap-3 text-muted-foreground/40">
-            <span>kimi-k2.5</span>
+            <span>{runtimeLabel}</span>
             <span className="text-muted-foreground/15">|</span>
             <span>parallel-agents</span>
             <span className="text-muted-foreground/15">|</span>
@@ -175,10 +191,12 @@ export default function OverviewPage() {
           inputTokensToday={data?.stats?.inputTokensToday || 0}
           outputTokensToday={data?.stats?.outputTokensToday || 0}
           costToday={data?.stats?.costToday || 0}
+          runtimeLabel={runtimeLabel}
           funnel={data?.funnel}
           costPerMerge={data?.stats?.costPerMerge || 0}
           tokensPerMerge={data?.stats?.tokensPerMerge || 0}
           avgHoursToReview={data?.stats?.avgHoursToReview}
+          budget={data?.budget}
         />
 
         {/* PR portfolio scoreboard + repo health */}
@@ -221,8 +239,9 @@ export default function OverviewPage() {
                 {connectionData.pipeline.errorsLastHour}
               </span></span>
               <span className="text-muted-foreground/10">|</span>
-              <span>model <span className="text-foreground/45">kimi-k2.5</span></span>
-              <span>cost <span className="text-foreground/45">$0.60/$3.00/M</span></span>
+              <span>model <span className="text-foreground/45">{runtimeLabel}</span></span>
+              <span>cost <span className="text-foreground/45">{pricingLabel}</span></span>
+              <span>budget <span className={data?.budget?.paused ? "text-red-400/60" : "text-foreground/45"}>{budgetLabel}</span></span>
               <span className="text-muted-foreground/10">|</span>
               <span>pii <span className="text-foreground/45">off</span></span>
             </div>
