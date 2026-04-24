@@ -31,10 +31,10 @@ You have skills loaded. **Read the SKILL.md file** (use the `read` tool) before 
 - **Safety**: Read `safety-checker` skill before any PR submission — it's the final gate.
 - **Context**: `context-manager` skill when context > 40%.
 - **Dashboard**: `dashboard-reporter` skill to report metrics.
-Skills: `~/clawOSS/workspace/skills/{name}/SKILL.md`. Load with `read`.
+Skills: `$CLAWOSS_WORKSPACE_DIR/skills/{name}/SKILL.md`. Load with `read`.
 
 ## 0. Health Checks
-**0a. Quick status snapshot**: `bash /Users/kevinlin/clawOSS/scripts/heartbeat-status.sh` — shows queue depth, open PRs, locks, always-on status, wake state in one JSON call.
+**0a. Quick status snapshot**: `bash $CLAWOSS_PROJECT_DIR/scripts/heartbeat-status.sh` — shows queue depth, open PRs, locks, always-on status, wake state in one JSON call.
 **0a2. Context**: Use the `session_status` tool (NOT a bash command — it's an OpenClaw built-in tool). **>35%: COMPACT IMMEDIATELY** — flush state to memory files, then `/compact`. Do NOT proceed to any other step until context is under 35%. This is the #1 cause of gateway timeouts and stalled cycles.
 **0b. Circuit breakers**: Read wake-state.md (or use heartbeat-status.sh output). If errors_this_hour >= 5, pause 2 minutes then continue (never fully stop). consecutive_wakes is informational only — never use it to skip work.
 **0b2. Cycle guardrails** (prevent runaway cycles and quota burn):
@@ -79,7 +79,7 @@ Always-on subagents use 4 slots. Remaining 10 for impl/followup. Total maxConcur
 
 ## 1. Stall Recovery
 Check for stalled sub-agents (no messages >5 min). Kill, re-queue at TOP of work-queue.md, increment errors_this_hour. Mark stalled task as `failed` in `memory/impl-spawn-state.md`. 2 consecutive stalls on same task = SKIP it.
-**Clean stale locks + orphaned state**: `bash /Users/kevinlin/clawOSS/scripts/cleanup-stale-sessions.sh` (removes locks >30min, resets orphaned spawned_pending entries)
+**Clean stale locks + orphaned state**: `bash $CLAWOSS_PROJECT_DIR/scripts/cleanup-stale-sessions.sh` (removes locks >30min, resets orphaned spawned_pending entries)
 
 ## 2. Pick New Work (PRIORITY — new PRs before follow-ups)
 
@@ -93,8 +93,8 @@ Count active impl/followup sub-agents (sessions_list, exclude main + always-on s
 - **impl/followup active >= 10**: skip to step 6. **Do NOT say "monitoring for completion events" and stop.** Always continue to step 6, then 7, then self-wake and loop back.
 - **impl/followup active < 10, queue has items**: pick next (urgent first, P(merge) >= 30, score >= 5). Gates:
   a. **IMPL SPAWN GUARD**: skip if issue has `spawned_pending` in `memory/impl-spawn-state.md`.
-  b. **DEDUP**: skip if in pr-ledger.md, in subagent-result-*.md, repo has `spawned_pending` in impl-spawn-state.md, OR lock file exists (`memory/locks/{owner}_{repo}.lock`). ALWAYS use `BillionClaw` explicitly — `@me` can fail in sub-agent contexts.
-  **DOUBLE-CHECK**: Before each spawn, re-run `gh search prs --author BillionClaw --repo {owner}/{repo} --state open --json number --jq 'length'`. If count changed, skip (race condition guard).
+  b. **DEDUP**: skip if in pr-ledger.md, in subagent-result-*.md, repo has `spawned_pending` in impl-spawn-state.md, OR lock file exists (`memory/locks/{owner}_{repo}.lock`). ALWAYS use the configured GitHub username explicitly — `@me` can fail in sub-agent contexts.
+  **DOUBLE-CHECK**: Before each spawn, re-run `gh search prs --author "${CLAW_AGENT_USERNAME:-${GITHUB_USERNAME:-clawoss-agent}}" --repo {owner}/{repo} --state open --json number --jq 'length'`. If count changed, skip (race condition guard).
   **LOCK FILE**: Before spawning, write lock: `echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) {issue}" > memory/locks/{owner}_{repo}.lock`. Sub-agent deletes lock after PR creation or failure. Orchestrator cleans stale locks (>30 minutes) in step 1 (stall recovery).
   b2. **BLOCKLIST HARD-BLOCK**: Read `memory/trust-repos.md` Deprioritized section. If the repo appears there AND `Skip Until` is "permanent" or a future date, SKIP unconditionally — no override by score, labels, or any other factor. Repos on this list have hostile maintainers, ban threats, or non-automatable CLAs.
   c. Skip if we had a PR closed on this repo in the last 7 days.
@@ -134,7 +134,7 @@ Count active impl/followup sub-agents (sessions_list, exclude main + always-on s
 **5a. Pre-spawn comment (score >= 8, or >= 6 for trusted repos):** Post brief comment: `gh issue comment {issue} --repo {owner}/{repo} --body "Looking into this — [1-sentence approach]. Happy to submit a fix."` Skip for lower scores.
 **5b.** Use the `read` tool to load `templates/subagent-implementation.md` from disk NOW (do NOT reuse cached content). Substitute `{repo}`, `{issue}`, `{title}` in the content. Spawn: `sessions_spawn(task: {THE_SUBSTITUTED_CONTENT}, label: "{repo}#{issue}", ...)`. Always re-read the template for EVERY spawn — files change between cycles. Pass repo conventions + issue details as attachments.
 **IMMEDIATELY mark issue as `spawned_pending` in `memory/impl-spawn-state.md` BEFORE spawning the next agent.**
-**NEVER use `@me` — it fails in sub-agent contexts. ALWAYS use `BillionClaw` explicitly.**
+**NEVER use `@me` — it fails in sub-agent contexts. ALWAYS use the configured GitHub username explicitly.**
 **Read `memory/repos/{owner}_{repo}.md`** if it exists — pass key info (target branch, CLA, CI) to the subagent via attachments.
 **5c. PASS OPEN PR CONTEXT**: Before spawning, fetch open PRs in the repo and pass as attachment:
 `gh pr list --repo {owner}/{repo} --state open --json number,title,headRefName --limit 20`
@@ -159,7 +159,7 @@ Load `templates/subagent-followup.md` from disk. Spawn with the staging data as 
 - failure/abandoned: mark `failed`. Log failure_reason in failure-log.md. `repo_health_fail` = cache 24h. If `fix_rejected_terminal` (2+ failed reworks) or `reviewer_rejected_scope`, deprioritize repo in trust-repos.md for 30 days. Single `fix_rejected` = rework opportunity, not deprioritization.
 - already_fixed: mark `completed`. Remove. Delete result file after processing.
 
-**6c. Trust validation**: When updating trust-repos.md, verify merge counts match reality: `gh search prs --author BillionClaw --repo {owner}/{repo} "is:merged" --json number --jq 'length'`. Don't trust cached counts — GitHub is the source of truth.
+**6c. Trust validation**: When updating trust-repos.md, verify merge counts match reality: `gh search prs --author "${CLAW_AGENT_USERNAME:-${GITHUB_USERNAME:-clawoss-agent}}" --repo {owner}/{repo} "is:merged" --json number --jq 'length'`. Don't trust cached counts — GitHub is the source of truth.
 
 **6b. Follow-up**: List `memory/subagent-result-followup-*.md`. Parse YAML. Clear `spawned_pending`, increment round.
 - `changes_pushed`/`question_answered`/`scope_adjusted`/`rework_in_progress` -> `follow_up_round_N` (continue iterating)

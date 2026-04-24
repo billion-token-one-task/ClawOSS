@@ -35,6 +35,36 @@ file_mtime_epoch() {
   echo 0
 }
 
+count_queue_items() {
+  local path="$1"
+  if [ ! -f "$path" ]; then
+    echo 0
+    return 0
+  fi
+
+  local checklist_count
+  checklist_count=$(grep -Ec '^\- \[' "$path" 2>/dev/null || true)
+  checklist_count=${checklist_count:-0}
+  if [ "$checklist_count" -gt 0 ] 2>/dev/null; then
+    echo "$checklist_count"
+    return 0
+  fi
+
+  # Support the markdown table format currently used by work-queue-staging.md
+  local table_count
+  table_count=$(awk '
+    /^\|[[:space:]]*[0-9]+[[:space:]]*\|/ { count++ }
+    END { print count + 0 }
+  ' "$path" 2>/dev/null)
+  table_count=${table_count:-0}
+  if [ "$table_count" -gt 0 ] 2>/dev/null; then
+    echo "$table_count"
+    return 0
+  fi
+
+  echo 0
+}
+
 # Wake state (macOS grep doesn't support -P, use sed instead)
 WAKE_STATE=$(cat "$MEMORY_DIR/wake-state.md" 2>/dev/null || echo "unavailable")
 CONSECUTIVE=$(echo "$WAKE_STATE" | sed -n 's/.*consecutive_wakes: *\([0-9]*\).*/\1/p' | head -1)
@@ -46,11 +76,11 @@ ERRORS=${ERRORS:-0}
 LOCK_COUNT=$(ls "$MEMORY_DIR/locks/"*.lock 2>/dev/null | wc -l | tr -d ' ')
 
 # Queue depth
-QUEUE_DEPTH=$(grep -c '^\- \[' "$MEMORY_DIR/work-queue.md" 2>/dev/null || true)
+QUEUE_DEPTH=$(count_queue_items "$MEMORY_DIR/work-queue.md")
 QUEUE_DEPTH=${QUEUE_DEPTH:-0}
 
 # Staging queue
-STAGING_DEPTH=$(grep -c '^\- \[' "$MEMORY_DIR/work-queue-staging.md" 2>/dev/null || true)
+STAGING_DEPTH=$(count_queue_items "$MEMORY_DIR/work-queue-staging.md")
 STAGING_DEPTH=${STAGING_DEPTH:-0}
 
 # Open PRs
