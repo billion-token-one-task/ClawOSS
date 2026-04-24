@@ -51,3 +51,8 @@ config/auth-profiles.json
 workspace/EOF
 workspace/subagent-work/
 dashboard/local.db
+dashboard/demo-local.db
+dashboard/demo-local.db.bak-*
+.idea/
+tmp/
+208184

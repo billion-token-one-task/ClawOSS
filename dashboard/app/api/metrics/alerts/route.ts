@@ -2,8 +2,10 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { db, ensureDb } from "@/lib/db";
-import { pullRequests, prReviews, autonomySnapshots, agentState } from "@/lib/schema";
+import { pullRequests, prReviews, autonomySnapshots, agentState, heartbeats, metricsTokens } from "@/lib/schema";
 import { eq, sql, desc, gte, and } from "drizzle-orm";
+import { preferAccurateMetrics } from "@/lib/metrics-source";
+import { computeBudgetStatus, extractRuntimeSnapshot } from "@/lib/runtime";
 
 interface Alert {
   id: string;
@@ -27,6 +29,48 @@ export async function GET() {
     await ensureDb();
     const alerts: Alert[] = [];
     const now = new Date();
+    const latestHeartbeat = await db
+      .select()
+      .from(heartbeats)
+      .orderBy(desc(heartbeats.timestamp))
+      .limit(1);
+    const runtime = extractRuntimeSnapshot(latestHeartbeat[0]?.metadata);
+    const metricRows = preferAccurateMetrics(
+      await db.select().from(metricsTokens).orderBy(desc(metricsTokens.timestamp))
+    );
+    const budget = computeBudgetStatus(
+      runtime,
+      metricRows.reduce(
+        (acc, metric) => {
+          acc.inputTokens += metric.inputTokens || 0;
+          acc.outputTokens += metric.outputTokens || 0;
+          acc.costUsd += metric.costUsd || 0;
+          return acc;
+        },
+        { inputTokens: 0, outputTokens: 0, costUsd: 0 }
+      )
+    );
+
+    if (budget.paused) {
+      alerts.push({
+        id: "budget-paused",
+        severity: "critical",
+        title: "Budget exhausted - agent paused",
+        detail: budget.pauseReason || "累计预算已触发暂停保护。",
+        metric: "budget",
+        value:
+          budget.tokenBudgetTotal != null
+            ? `${budget.usedTokensTotal}/${budget.tokenBudgetTotal} tokens`
+            : `$${budget.usedCostTotalUsd.toFixed(2)}`,
+        threshold:
+          budget.tokenBudgetTotal != null
+            ? `${budget.tokenBudgetTotal} tokens`
+            : budget.costBudgetUsdTotal != null
+            ? `$${budget.costBudgetUsdTotal.toFixed(2)}`
+            : null,
+        timestamp: now.toISOString(),
+      });
+    }
 
     // 1. Merge rate check
     const [totalResult, mergedResult] = await Promise.all([

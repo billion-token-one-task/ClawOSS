@@ -15,6 +15,8 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 WORKSPACE_DIR="$PROJECT_DIR/workspace"
 DEPLOYED_CONFIG="$HOME/.openclaw/openclaw.json"
 GATEWAY_PLIST="$HOME/Library/LaunchAgents/ai.openclaw.gateway.plist"
+export CLAWOSS_PROJECT_DIR="${CLAWOSS_PROJECT_DIR:-$PROJECT_DIR}"
+export CLAWOSS_WORKSPACE_DIR="${CLAWOSS_WORKSPACE_DIR:-$WORKSPACE_DIR}"
 
 # ── 0. Preflight checks ──────────────────────────────────────────────
 MISSING=()
@@ -54,8 +56,8 @@ else
 fi
 
 # ── 2. Git identity ──────────────────────────────────────────────────
-GITHUB_USERNAME="${GITHUB_USERNAME:-BillionClaw}"
-GITHUB_EMAIL="${GITHUB_EMAIL:-267901332+BillionClaw@users.noreply.github.com}"
+GITHUB_USERNAME="${GITHUB_USERNAME:-clawoss-agent}"
+GITHUB_EMAIL="${GITHUB_EMAIL:-clawoss-agent@users.noreply.github.com}"
 git config --global user.name "$GITHUB_USERNAME"
 git config --global user.email "$GITHUB_EMAIL"
 echo "[OK] Git identity: $GITHUB_USERNAME <$GITHUB_EMAIL>"
@@ -91,20 +93,10 @@ fi
 # Preserves gateway-managed sections (meta, commands, plugins, gateway.auth)
 # while overlaying all agent/tool/skill settings from the repo config.
 
-REPO_CONFIG_RESOLVED=$(sed \
-    -e "s|__WORKSPACE_PATH__|$WORKSPACE_DIR|g" \
-    -e "s|__PROJECT_DIR__|$PROJECT_DIR|g" \
-    -e "s|__HOME_DIR__|$HOME|g" \
-    "$PROJECT_DIR/config/openclaw.json")
+REPO_CONFIG_RESOLVED=$(node "$PROJECT_DIR/scripts/render-openclaw-config.mjs")
 
 _REPO_CONFIG="$REPO_CONFIG_RESOLVED" \
 _DEPLOYED="$DEPLOYED_CONFIG" \
-_KIMI_KEY="${KIMI_API_KEY:-}" \
-_MINIMAX_KEY="${MINIMAX_API_KEY:-}" \
-_GH_TOKEN="${GITHUB_TOKEN:-}" \
-_DASH_URL="${DASHBOARD_URL:-https://clawoss-dashboard.vercel.app}" \
-_CLAW_KEY="${CLAW_API_KEY:-}" \
-_OPENROUTER_KEY="${OPENROUTER_API_KEY:-}" \
 python3 -c "
 import json, os
 
@@ -127,21 +119,6 @@ except (FileNotFoundError, json.JSONDecodeError):
     deployed = {}
 
 merged = deep_merge(deployed, repo_config)
-
-# Inject env vars (non-empty only)
-merged.setdefault('env', {})
-env_map = {
-    'KIMI_API_KEY': os.environ.get('_KIMI_KEY', ''),
-    'MINIMAX_API_KEY': os.environ.get('_MINIMAX_KEY', ''),
-    'GITHUB_TOKEN': os.environ.get('_GH_TOKEN', ''),
-    'DASHBOARD_URL': os.environ.get('_DASH_URL', ''),
-    'CLAW_API_KEY': os.environ.get('_CLAW_KEY', ''),
-    'OPENROUTER_API_KEY': os.environ.get('_OPENROUTER_KEY', ''),
-}
-for k, v in env_map.items():
-    if v:
-        merged['env'][k] = v
-merged['env'] = {k: v for k, v in merged['env'].items() if v}
 
 with open(deployed_path, 'w') as f:
     json.dump(merged, f, indent=2)
@@ -374,13 +351,17 @@ fi
 
 # ── 15b. Ensure dual push remotes (CMLKevin + billion-token-one-task) ──
 cd "$PROJECT_DIR"
-# Add billionclaw as second push URL so `git push origin` goes to both repos
-PUSH_URLS=$(git remote get-url --push --all origin 2>/dev/null || echo "")
-if ! echo "$PUSH_URLS" | grep -q "billion-token-one-task"; then
-    git remote set-url --add --push origin https://github.com/billion-token-one-task/ClawOSS.git 2>/dev/null || true
-    echo "[OK] Added billion-token-one-task as second push target"
+# Add the canonical upstream mirror as a second push URL so `git push origin` can reach both remotes when desired
+if [ -n "${CLAWOSS_EXTRA_PUSH_URL:-}" ]; then
+    PUSH_URLS=$(git remote get-url --push --all origin 2>/dev/null || echo "")
+    if ! echo "$PUSH_URLS" | grep -q "^${CLAWOSS_EXTRA_PUSH_URL}$"; then
+        git remote set-url --add --push origin "$CLAWOSS_EXTRA_PUSH_URL" 2>/dev/null || true
+        echo "[OK] Added extra push target from CLAWOSS_EXTRA_PUSH_URL"
+    else
+        echo "[OK] Extra push target already configured"
+    fi
 else
-    echo "[OK] Dual push remotes already configured"
+    echo "[INFO] CLAWOSS_EXTRA_PUSH_URL not set - skipping extra push target"
 fi
 
 # ── 16. Kick the agent ───────────────────────────────────────────────
@@ -414,12 +395,12 @@ fi
 # ── Summary ───────────────────────────────────────────────────────────
 echo ""
 echo "=== ClawOSS V10 Running ==="
-echo "  Model: minimax/m2.7 (MiniMax M2.7, 204k context) + kimi-coding/k2p5 fallback"
-echo "  Dashboard: https://clawoss-dashboard.vercel.app"
+echo "  Model: $(node "$PROJECT_DIR/scripts/render-openclaw-config.mjs" --print-primary-model 2>/dev/null || echo unknown)"
+echo "  Dashboard: $DASH_URL"
 echo "  Slots: 3 always-on (scout + PR monitor + PR analyst) + 10 impl/followup = 13"
 echo "  Heartbeat: 5m"
 echo "  Logs: openclaw logs"
-echo "  PRs: gh search prs --author BillionClaw --state open"
+echo "  PRs: gh search prs --author ${GITHUB_USERNAME} --state open"
 echo "  Stop: openclaw gateway stop && pkill -f dashboard-sync"
 echo ""
 echo "V10.1 features: P(merge) scoring, no per-repo PR cap,"

@@ -10,6 +10,9 @@ INTERVAL=300  # 5 minutes
 MAX_AGE=30    # minutes of inactivity before deletion
 PID_FILE="/tmp/clawoss-cleaner.pid"
 LOG_FILE="/tmp/clawoss-cleaner.log"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="${CLAWOSS_PROJECT_DIR:-$(dirname "$SCRIPT_DIR")}"
+WORKSPACE_DIR="${CLAWOSS_WORKSPACE_DIR:-$PROJECT_DIR/workspace}"
 
 # Write PID for stop control
 echo $$ > "$PID_FILE"
@@ -77,7 +80,7 @@ cleanup_cycle() {
     find /private/tmp -maxdepth 1 -name "test_*.rs" -mmin +${MAX_AGE} -delete 2>/dev/null
 
     # 5. Clean workspace/repos/ and workspace/workdir/ if >100MB
-    for wsdir in /Users/kevinlin/clawOSS/workspace/repos /Users/kevinlin/clawOSS/workspace/workdir; do
+    for wsdir in "$WORKSPACE_DIR/repos" "$WORKSPACE_DIR/workdir"; do
         if [ -d "$wsdir" ]; then
             ws_size=$(du -sm "$wsdir" 2>/dev/null | cut -f1)
             if [ "${ws_size:-0}" -gt 100 ]; then

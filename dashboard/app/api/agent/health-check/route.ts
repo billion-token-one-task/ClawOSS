@@ -2,8 +2,10 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { db, ensureDb } from "@/lib/db";
-import { pullRequests, prReviews, agentLogs } from "@/lib/schema";
-import { eq, sql, gte } from "drizzle-orm";
+import { pullRequests, prReviews, agentLogs, heartbeats, metricsTokens } from "@/lib/schema";
+import { eq, sql, gte, desc } from "drizzle-orm";
+import { preferAccurateMetrics } from "@/lib/metrics-source";
+import { computeBudgetStatus, extractRuntimeSnapshot } from "@/lib/runtime";
 
 /**
  * Hard blocklist — repos where submitting PRs risks bans or reputation damage.
@@ -47,6 +49,27 @@ export async function GET() {
     await ensureDb();
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const latestHeartbeat = await db
+      .select()
+      .from(heartbeats)
+      .orderBy(desc(heartbeats.timestamp))
+      .limit(1);
+    const runtime = extractRuntimeSnapshot(latestHeartbeat[0]?.metadata);
+    const metricRows = preferAccurateMetrics(
+      await db.select().from(metricsTokens).orderBy(desc(metricsTokens.timestamp))
+    );
+    const budget = computeBudgetStatus(
+      runtime,
+      metricRows.reduce(
+        (acc, metric) => {
+          acc.inputTokens += metric.inputTokens || 0;
+          acc.outputTokens += metric.outputTokens || 0;
+          acc.costUsd += metric.costUsd || 0;
+          return acc;
+        },
+        { inputTokens: 0, outputTokens: 0, costUsd: 0 }
+      )
+    );
 
     // Basic stats
     const [totalResult, mergedResult, openResult] = await Promise.all([
@@ -166,6 +189,12 @@ export async function GET() {
     // Quick directives
     const directives: string[] = [];
 
+    if (budget.paused) {
+      directives.unshift(
+        `PAUSE NOW: ${budget.pauseReason}. Do not spawn, comment, or submit until budget is increased or reset.`
+      );
+    }
+
     if (approvedPRs.length > 0) {
       directives.unshift("MERGE NOW: " + approvedPRs.length + " approved PR(s) ready to merge: " + approvedPRs.map((pr) => pr.repo + "#" + pr.number).join(", ") + ". Run `gh pr merge --squash` if CI passes, or comment asking maintainer to trigger CI.");
     }
@@ -203,7 +232,10 @@ export async function GET() {
     }
 
     return NextResponse.json({
-      healthy: directives.length === 0,
+      healthy: directives.length === 0 && !budget.paused,
+      pauseAgent: budget.paused,
+      pauseReason: budget.pauseReason,
+      budget,
       stats: {
         total,
         merged,

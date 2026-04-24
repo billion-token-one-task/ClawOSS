@@ -4,6 +4,8 @@ import { NextResponse } from "next/server";
 import { db, ensureDb } from "@/lib/db";
 import { heartbeats, metricsTokens, agentLogs } from "@/lib/schema";
 import { desc, gte, sql, eq, and } from "drizzle-orm";
+import { preferAccurateMetrics } from "@/lib/metrics-source";
+import { computeBudgetStatus, extractRuntimeSnapshot } from "@/lib/runtime";
 
 export async function GET() {
   try {
@@ -59,6 +61,24 @@ export async function GET() {
       .orderBy(desc(metricsTokens.timestamp))
       .limit(1);
 
+    const allMetrics = preferAccurateMetrics(
+      await db.select().from(metricsTokens)
+    );
+    const totals = allMetrics.reduce(
+      (acc, metric) => {
+        acc.inputTokens += metric.inputTokens || 0;
+        acc.outputTokens += metric.outputTokens || 0;
+        acc.costUsd += metric.costUsd || 0;
+        return acc;
+      },
+      { inputTokens: 0, outputTokens: 0, costUsd: 0 }
+    );
+    const runtime = extractRuntimeSnapshot(hb?.metadata);
+    const budget = computeBudgetStatus(runtime, totals);
+    if (budget.paused) {
+      connectionMessage = budget.pauseReason || "Agent paused by budget guardrail";
+    }
+
     // Data pipeline status
     const hasHeartbeats = (recentHeartbeats[0]?.count || 0) > 0;
     const hasMetrics = !!lastMetric[0];
@@ -80,6 +100,8 @@ export async function GET() {
         errorsLastHour: recentErrors[0]?.count || 0,
         lastMetricAt: lastMetric[0]?.timestamp || null,
       },
+      runtime,
+      budget,
       hasAnyData: hasHeartbeats || hasMetrics,
     });
   } catch (error) {

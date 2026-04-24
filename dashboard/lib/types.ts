@@ -1,5 +1,7 @@
 export interface AgentStatus {
   isOnline: boolean;
+  isPaused: boolean;
+  pauseReason: string | null;
   lastHeartbeat: Date;
   currentTask: string | null;
   uptimeSeconds: number;
@@ -189,6 +191,30 @@ export interface AgentState {
 
 export interface DashboardOverview {
   agentStatus: AgentStatus;
+  runtime: {
+    primaryModel: string | null;
+    primaryModelName: string | null;
+    primaryProvider: string | null;
+    fallbackModels: string[];
+    heartbeatIntervalMinutes: number;
+    pricing: {
+      inputUsdPerMillionTokens: number | null;
+      outputUsdPerMillionTokens: number | null;
+    };
+  };
+  budget: {
+    tokenBudgetTotal: number | null;
+    costBudgetUsdTotal: number | null;
+    usedTokensTotal: number;
+    usedCostTotalUsd: number;
+    remainingTokens: number | null;
+    remainingCostUsd: number | null;
+    tokenUsagePercent: number | null;
+    costUsagePercent: number | null;
+    exhausted: boolean;
+    paused: boolean;
+    pauseReason: string | null;
+  };
   stats: {
     totalPRs: number;
     mergedPRs: number;

@@ -18,6 +18,9 @@ REPO="$1"
 OWNER="${REPO%%/*}"
 REPO_NAME="${REPO##*/}"
 THRESHOLD="${2:-5}"  # minimum composite score, default 5
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="${PROJECT_DIR:-${CLAWOSS_PROJECT_DIR:-$(dirname "$SCRIPT_DIR")}}"
+TRUST_FILE="${PROJECT_DIR}/workspace/memory/trust-repos.md"
 
 # Date calculations (macOS + Linux compatible)
 if date -v-1d +%Y-%m-%d &>/dev/null; then
@@ -31,6 +34,19 @@ fi
 score=0
 reasons=()
 warnings=()
+
+is_trusted_repo() {
+  local repo="$1"
+  [ -f "$TRUST_FILE" ] || return 1
+  grep -qiE "^[[:space:]]*-[[:space:]]*${repo//\//\\/}([[:space:]]|$)" "$TRUST_FILE"
+}
+
+TRUSTED_REPO=false
+if is_trusted_repo "$REPO"; then
+  TRUSTED_REPO=true
+  score=$((score + 2))
+  warnings+=("trusted repo override enabled for ${REPO}")
+fi
 
 # Helper: emit JSON and exit with failure
 fail() {
@@ -234,15 +250,20 @@ if [ "$STARS" -ge 5000 ]; then
 else
   REVIEW_MIN=50
 fi
-if [ "$REVIEW_RATE" -lt "$REVIEW_MIN" ]; then
+if [ "$REVIEW_RATE" -lt "$REVIEW_MIN" ] && [ "$TRUSTED_REPO" != "true" ]; then
   reasons+=("review_rate=${REVIEW_RATE}% (<${REVIEW_MIN}%)")
   fail "review rate ${REVIEW_RATE}% (<${REVIEW_MIN}%)" "repo_health_fail: review rate ${REVIEW_RATE}% below ${REVIEW_MIN}% minimum"
+fi
+if [ "$REVIEW_RATE" -lt "$REVIEW_MIN" ] && [ "$TRUSTED_REPO" = "true" ]; then
+  warnings+=("trusted repo ${REPO} bypassed review-rate floor (${REVIEW_RATE}% < ${REVIEW_MIN}%)")
 fi
 if [ "$REVIEW_RATE" -ge 80 ]; then
   score=$((score + 3))
 elif [ "$REVIEW_RATE" -ge 60 ]; then
   score=$((score + 2))
-else
+elif [ "$REVIEW_RATE" -ge "$REVIEW_MIN" ]; then
+  score=$((score + 1))
+elif [ "$TRUSTED_REPO" = "true" ]; then
   score=$((score + 1))
 fi
 
@@ -285,6 +306,7 @@ done
 
 # All other CLA repos are allowed — we sign CLAs via CLA-assistant or DCO.
 HAS_CLA=false
+HAS_DCO=false
 AUTOMATABLE_CLA_ORGS="deepset-ai iterative Aider-AI milvus-io BerriAI"
 for org in $AUTOMATABLE_CLA_ORGS; do
   if [ "$OWNER" = "$org" ]; then HAS_CLA=true; break; fi
@@ -295,11 +317,20 @@ if [ "$HAS_CLA" = "false" ]; then
 fi
 if [ "$HAS_CLA" = "false" ]; then
   CLA_ACTION=$(gh api "repos/${REPO}/contents/.github/workflows" \
-    --jq '[.[] | select(.name | test("cla|dco"; "i"))] | length' 2>/dev/null || echo "0")
+    --jq '[.[] | select(.name | test("cla"; "i"))] | length' 2>/dev/null || echo "0")
   [ "$CLA_ACTION" -gt 0 ] && HAS_CLA=true
 fi
 if [ "$HAS_CLA" = "true" ]; then
-  warnings+=("CLA/DCO required — sign it before submitting PR")
+  warnings+=("CLA required — manual signing needed before submitting PR")
+fi
+
+if [ "$HAS_CLA" = "false" ]; then
+  DCO_ACTION=$(gh api "repos/${REPO}/contents/.github/workflows" \
+    --jq '[.[] | select(.name | test("dco"; "i"))] | length' 2>/dev/null || echo "0")
+  [ "$DCO_ACTION" -gt 0 ] && HAS_DCO=true
+fi
+if [ "$HAS_DCO" = "true" ]; then
+  warnings+=("DCO required — use signed-off commits when submitting PR")
 fi
 
 # ─── 8. Niche fit (agentic AI) ───
@@ -364,8 +395,11 @@ cat <<ENDJSON
     "has_ci": $([ "$HAS_CI" -gt 0 ] && echo true || echo false),
     "has_contributing": ${HAS_CONTRIBUTING},
     "has_cla": ${HAS_CLA},
+    "has_dco": ${HAS_DCO},
     "anti_bot": ${ANTI_BOT},
     "has_gfi_labels": $([ "$GFI_COUNT" -gt 0 ] && echo true || echo false)
+    ,
+    "trusted_repo": ${TRUSTED_REPO}
   }
 }
 ENDJSON

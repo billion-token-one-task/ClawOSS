@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# compute-merge-probability.sh — Calculate P(merge) score for an issue/repo pair
+# compute-merge-probability.sh 鈥?Calculate P(merge) score for an issue/repo pair
 # Usage: compute-merge-probability.sh <owner/repo> <issue_number> [--type fix|docs|test|typo]
 # Outputs JSON with score 0-100 and component breakdown
 # Exit 0 always (score=0 means skip)
 
 REPO="${1:?Usage: compute-merge-probability.sh <owner/repo> <issue_number> [--type TYPE]}"
 ISSUE="${2:?Usage: compute-merge-probability.sh <owner/repo> <issue_number>}"
-PROJECT_DIR="${PROJECT_DIR:-/Users/kevinlin/clawOSS}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="${PROJECT_DIR:-${CLAWOSS_PROJECT_DIR:-$(dirname "$SCRIPT_DIR")}}"
 TYPE="fix"
 
 shift 2
@@ -19,11 +20,12 @@ done
 
 OWNER="${REPO%%/*}"
 REPO_NAME="${REPO##*/}"
+AGENT_USER="${CLAW_AGENT_USERNAME:-${GITHUB_USERNAME:-clawoss-agent}}"
 
 # Weights: 15% task_type + 20% size + 15% responsiveness + 25% trust + 10% freshness + 10% contributor_fit + 5% competition
 W_TYPE=15 W_SIZE=20 W_RESPONSIVE=15 W_TRUST=25 W_FRESH=10 W_FIT=10 W_COMP=5
 
-# ─── 1. Task type score (0-100) ───
+# 鈹€鈹€鈹€ 1. Task type score (0-100) 鈹€鈹€鈹€
 case "$TYPE" in
   docs|typo) S_TYPE=90 ;;
   test)      S_TYPE=80 ;;
@@ -31,7 +33,7 @@ case "$TYPE" in
   *)         S_TYPE=50 ;;
 esac
 
-# ─── 2. Size estimate from issue body length (0-100, smaller = better) ───
+# 鈹€鈹€鈹€ 2. Size estimate from issue body length (0-100, smaller = better) 鈹€鈹€鈹€
 BODY_LEN=$(gh api "repos/${REPO}/issues/${ISSUE}" --jq '.body | length' 2>/dev/null || echo 500)
 if [ "$BODY_LEN" -lt 200 ]; then
   S_SIZE=90
@@ -43,7 +45,7 @@ else
   S_SIZE=30
 fi
 
-# ─── 3. Repo responsiveness (0-100) ───
+# 鈹€鈹€鈹€ 3. Repo responsiveness (0-100) 鈹€鈹€鈹€
 AVG_COMMENTS=$(gh api "repos/${REPO}/issues?state=closed&per_page=5&sort=updated" --jq '[.[].comments] | add / length' 2>/dev/null || echo 0)
 if python3 -c "exit(0 if float('${AVG_COMMENTS:-0}') > 3 else 1)" 2>/dev/null; then
   S_RESPONSIVE=85
@@ -55,7 +57,7 @@ else
   S_RESPONSIVE=20
 fi
 
-# ─── 4. Trust score (0-100) ───
+# 鈹€鈹€鈹€ 4. Trust score (0-100) 鈹€鈹€鈹€
 TRUST_FILE="$PROJECT_DIR/workspace/memory/trust-repos.md"
 S_TRUST=50
 if [ -f "$TRUST_FILE" ]; then
@@ -69,7 +71,7 @@ if [ -f "$TRUST_FILE" ]; then
   [ -n "$DEPRI" ] && S_TRUST=5
 fi
 
-# ─── 5. Freshness score (0-100) ───
+# 鈹€鈹€鈹€ 5. Freshness score (0-100) 鈹€鈹€鈹€
 CREATED_AT=$(gh api "repos/${REPO}/issues/${ISSUE}" --jq '.created_at' 2>/dev/null || echo "")
 S_FRESH=50
 if [ -n "$CREATED_AT" ]; then
@@ -83,19 +85,19 @@ if [ -n "$CREATED_AT" ]; then
   else S_FRESH=15; fi
 fi
 
-# ─── 6. Contributor fit (0-100) ───
-PREV_PRS=$(gh search prs --author BillionClaw --repo "$REPO" "is:merged" --json number --jq 'length' 2>/dev/null || echo 0)
+# 鈹€鈹€鈹€ 6. Contributor fit (0-100) 鈹€鈹€鈹€
+PREV_PRS=$(gh search prs --author "$AGENT_USER" --repo "$REPO" "is:merged" --json number --jq 'length' 2>/dev/null || echo 0)
 if [ "$PREV_PRS" -gt 2 ]; then S_FIT=95
 elif [ "$PREV_PRS" -gt 0 ]; then S_FIT=80
 else S_FIT=50; fi
 
-# ─── 7. Competition (0-100) ───
+# 鈹€鈹€鈹€ 7. Competition (0-100) 鈹€鈹€鈹€
 OPEN_PRS=$(gh api "repos/${REPO}/issues/${ISSUE}/timeline" --jq '[.[] | select(.event=="cross-referenced") | .source.issue | select(.pull_request != null and .state == "open")] | length' 2>/dev/null || echo 0)
 if [ "$OPEN_PRS" -eq 0 ]; then S_COMP=95
 elif [ "$OPEN_PRS" -eq 1 ]; then S_COMP=40
 else S_COMP=10; fi
 
-# ─── Calculate weighted score ───
+# 鈹€鈹€鈹€ Calculate weighted score 鈹€鈹€鈹€
 SCORE=$(python3 -c "
 t=$S_TYPE; sz=$S_SIZE; r=$S_RESPONSIVE; tr=$S_TRUST; f=$S_FRESH; ft=$S_FIT; c=$S_COMP
 wt=$W_TYPE; wsz=$W_SIZE; wr=$W_RESPONSIVE; wtr=$W_TRUST; wf=$W_FRESH; wft=$W_FIT; wc=$W_COMP

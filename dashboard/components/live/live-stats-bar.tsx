@@ -2,17 +2,15 @@
 
 import { useMemo, useState, useEffect } from "react";
 import { formatTokens } from "@/lib/utils";
-import { DEFAULT_COST_MODEL } from "@/lib/cost-models";
 import type { ConversationMessage } from "@/lib/types";
-
-const INPUT_COST_PER_TOKEN = DEFAULT_COST_MODEL.inputCostPerToken;
-const OUTPUT_COST_PER_TOKEN = DEFAULT_COST_MODEL.outputCostPerToken;
 
 interface LiveStatsBarProps {
   messages: ConversationMessage[];
   isConnected: boolean;
   lastHeartbeat?: string | null;
   errorsLastHour?: number;
+  inputCostPerToken?: number;
+  outputCostPerToken?: number;
 }
 
 export function LiveStatsBar({
@@ -20,6 +18,8 @@ export function LiveStatsBar({
   isConnected,
   lastHeartbeat,
   errorsLastHour = 0,
+  inputCostPerToken = 0,
+  outputCostPerToken = 0,
 }: LiveStatsBarProps) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
@@ -48,8 +48,8 @@ export function LiveStatsBar({
     const inputTokens = Math.round(totalTokens * 0.6);
     const outputTokens = totalTokens - inputTokens;
     const estimatedCost =
-      inputTokens * INPUT_COST_PER_TOKEN +
-      outputTokens * OUTPUT_COST_PER_TOKEN;
+      inputTokens * inputCostPerToken +
+      outputTokens * outputCostPerToken;
 
     let msgsPerMin = 0;
     if (totalMessages >= 2) {
@@ -114,7 +114,7 @@ export function LiveStatsBar({
       tokenBurnRate,
       sanitizedCount,
     };
-  }, [messages]);
+  }, [inputCostPerToken, messages, outputCostPerToken]);
 
   // Compute staleness — only after mount to avoid hydration mismatch from Date.now()
   const stalenessLabel = useMemo(() => {

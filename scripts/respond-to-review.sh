@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# respond-to-review.sh — Simple follow-up actions for PR reviews
+# respond-to-review.sh 鈥?Simple follow-up actions for PR reviews
 # Usage: respond-to-review.sh <owner/repo> <pr_number> <action> [--message <msg>]
 # Actions: merge, bump, identity, close-fixed, close-invalid, thank, comment
 # Exit 0 = action taken, Exit 1 = failed
@@ -8,6 +8,7 @@ REPO="${1:?Usage: respond-to-review.sh <owner/repo> <pr_number> <action>}"
 PR_NUM="${2:?Usage: respond-to-review.sh <owner/repo> <pr_number> <action>}"
 ACTION="${3:?Usage: respond-to-review.sh <owner/repo> <pr_number> <action>}"
 MESSAGE=""
+AGENT_USER="${CLAW_AGENT_USERNAME:-${GITHUB_USERNAME:-clawoss-agent}}"
 
 shift 3
 while [ $# -gt 0 ]; do
@@ -41,14 +42,14 @@ case "$ACTION" in
   identity)
     # Respond to "are you a bot?" questions
     gh api "repos/${REPO}/issues/${PR_NUM}/comments" \
-      -f body="${MESSAGE:-This is BillionClaw. Happy to discuss the approach or make adjustments to the fix.}" 2>/dev/null
+      -f body="${MESSAGE:-This is ${AGENT_USER}. Happy to discuss the approach or make adjustments to the fix.}" 2>/dev/null
     [ $? -eq 0 ] && echo '{"success": true, "action": "identity"}' || fail "Failed to post identity response"
     ;;
 
   close-fixed)
     # Close PR because the issue was fixed elsewhere
     gh pr close "$PR_NUM" --repo "$REPO" \
-      --comment "${MESSAGE:-Closing — the underlying issue has been resolved in another PR. Thank you for the review time!}" 2>/dev/null
+      --comment "${MESSAGE:-Closing 鈥?the underlying issue has been resolved in another PR. Thank you for the review time!}" 2>/dev/null
     [ $? -eq 0 ] && echo '{"success": true, "action": "close-fixed"}' || fail "Failed to close PR"
     ;;
 
