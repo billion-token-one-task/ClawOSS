@@ -10,6 +10,12 @@ export interface CostModel {
 }
 
 export const COST_MODELS: Record<string, CostModel> = {
+  "openai/gpt-5.5": {
+    name: "GPT-5.5",
+    provider: "openai",
+    inputCostPerToken: 5.0 / 1_000_000,
+    outputCostPerToken: 30.0 / 1_000_000,
+  },
   "kimi-coding/k2p5": {
     name: "Kimi K2.5 (Kimi Code)",
     provider: "kimi-code",
@@ -60,13 +66,13 @@ export const COST_MODELS: Record<string, CostModel> = {
   },
 };
 
-// Default model for the ClawOSS agent (switched to MiniMax M2.7 direct API)
-export const DEFAULT_MODEL = "minimax/MiniMax-M2.7";
+// Default model for the ClawOSS agent.
+export const DEFAULT_MODEL = "openai/gpt-5.5";
 export const DEFAULT_COST_MODEL = COST_MODELS[DEFAULT_MODEL];
 
 /**
  * Compute the cost for a given token usage.
- * Falls back to the default Kimi Code pricing if model is unknown.
+ * Falls back to the default model pricing if model is unknown.
  */
 export function computeTokenCost(
   inputTokens: number,

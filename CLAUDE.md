@@ -59,15 +59,15 @@ The quality of ClawOSS output is 100% determined by its prompts. When strategy c
 - Review prompts regularly for cross-file consistency
 
 ## Model
-- MiniMax M2.7 via direct API (`https://api.minimaxi.com/v1`)
-- 204k context window, 131k max output
-- Fallback: Kimi Code k2p5
-- API key env var: `MINIMAX_API_KEY`
+- Default: `openai/gpt-5.5`
+- Fallback: `openai/gpt-5.5`
+- Override with `CLAWOSS_MODEL` and `CLAWOSS_FALLBACK_MODEL`
+- API key env var for the default model: `OPENAI_API_KEY`
 
 ## Common Commands
 ```bash
 # Restart agent
-cd /Users/kevinlin/clawOSS && bash scripts/restart.sh
+bash scripts/restart.sh
 
 # Check agent status
 openclaw logs 2>&1 | tail -20

@@ -14,7 +14,8 @@ attachments: [repo-conventions.md, issue-details.md]
 ## CRITICAL: Workspace Rules
 **EVERY bash block MUST start with:**
 ```bash
-SCRIPTS=/Users/kevinlin/clawOSS/scripts
+: "${CLAWOSS_PROJECT_DIR:?Set CLAWOSS_PROJECT_DIR to the ClawOSS project root}"
+SCRIPTS="$CLAWOSS_PROJECT_DIR/scripts"
 ```
 **ALL work MUST happen in `/tmp/clawoss-{issue}-{timestamp}/`.** NEVER clone repos to `/tmp/{repo-name}/` or any other location. NEVER run `npm install`, `pip install`, `cargo build`, or any dependency installation OUTSIDE your `/tmp/clawoss-*` workspace. This is NON-NEGOTIABLE — a cleanup daemon deletes stale dirs, and anything outside `/tmp/clawoss-*` wastes disk and escapes cleanup.
 
@@ -27,11 +28,11 @@ You have `web_search` and `web_fetch` tools. **Use them before and during implem
 
 ## Skills — Load These Before Working
 You have skills available. **Read each SKILL.md file** with the `read` tool for detailed instructions:
-1. **`~/clawOSS/workspace/skills/oss-implement/SKILL.md`** — The reproduce-first workflow. Read this FIRST.
-2. **`~/clawOSS/workspace/skills/oss-review/SKILL.md`** — 8-point self-review checklist. Read BEFORE committing.
-3. **`~/clawOSS/workspace/skills/safety-checker/SKILL.md`** — Final safety gate. Read BEFORE submitting PR.
-4. **`~/clawOSS/workspace/skills/oss-submit/SKILL.md`** — PR creation workflow. Read when ready to submit.
-5. **`~/clawOSS/workspace/skills/systematic-debugging/SKILL.md`** — If you get stuck debugging, read this for structured approach.
+1. **`$CLAWOSS_PROJECT_DIR/workspace/skills/oss-implement/SKILL.md`** — The reproduce-first workflow. Read this FIRST.
+2. **`$CLAWOSS_PROJECT_DIR/workspace/skills/oss-review/SKILL.md`** — 8-point self-review checklist. Read BEFORE committing.
+3. **`$CLAWOSS_PROJECT_DIR/workspace/skills/safety-checker/SKILL.md`** — Final safety gate. Read BEFORE submitting PR.
+4. **`$CLAWOSS_PROJECT_DIR/workspace/skills/oss-submit/SKILL.md`** — PR creation workflow. Read when ready to submit.
+5. **`$CLAWOSS_PROJECT_DIR/workspace/skills/systematic-debugging/SKILL.md`** — If you get stuck debugging, read this for structured approach.
 Load skills proactively — they contain exact steps, not just guidelines.
 
 ## Performance Standards — Non-Negotiable
@@ -88,7 +89,8 @@ Read the attached repo-conventions.md and issue-details.md.
 
 1. SETUP WORKSPACE — run quick checks, then clone:
    ```bash
-   SCRIPTS=/Users/kevinlin/clawOSS/scripts
+   : "${CLAWOSS_PROJECT_DIR:?Set CLAWOSS_PROJECT_DIR to the ClawOSS project root}"
+   SCRIPTS="$CLAWOSS_PROJECT_DIR/scripts"
 
    # Quick checks (use gh directly — no scripts needed for basic gates)
    # Is issue still open?
@@ -296,10 +298,14 @@ Read the attached repo-conventions.md and issue-details.md.
    fi
    git push fork $BRANCH --force
 
-   # Create PR
-   PR_URL=$(gh pr create --repo {repo} --head BillionClaw:$BRANCH --base $DEFAULT_BRANCH --title "$PR_TITLE" --body "$PR_BODY")
-   ```
-   echo "PR created: $PR_URL"
+   # Create PR unless CLAWOSS_DRY_RUN=true
+   if ! bash "$SCRIPTS/dry-run-gate.sh" --repo {repo} --head "BillionClaw:$BRANCH" --base "$DEFAULT_BRANCH" --title "$PR_TITLE" --body "$PR_BODY" --issue "https://github.com/{repo}/issues/{issue}"; then
+     echo "DRY_RUN_PR_LOGGED: workspace/memory/dry-run-log.md"
+     PR_URL=""
+   else
+     PR_URL=$(gh pr create --repo {repo} --head BillionClaw:$BRANCH --base $DEFAULT_BRANCH --title "$PR_TITLE" --body "$PR_BODY")
+     echo "PR created: $PR_URL"
+   fi
    ```
    Do NOT wait for remote CI. Submit and report result.
 

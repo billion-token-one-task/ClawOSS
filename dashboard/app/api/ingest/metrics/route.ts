@@ -44,7 +44,7 @@ export async function POST(request: Request) {
       const rawCost = metric.costUsd as number | null | undefined;
       const model = (metric.model as string) || null;
 
-      // Auto-compute cost using Kimi K2.5 pricing if not provided
+      // Auto-compute cost from the reported model if not provided.
       const costUsd =
         rawCost != null && rawCost > 0
           ? rawCost

@@ -35,8 +35,7 @@ export function Header({ title }: HeaderProps) {
             <div className="text-xs space-y-1 max-w-[220px]">
               <p className="font-medium">PII Sanitizer Plugin</p>
               <p>
-                Disabled. Using Kimi Code direct API which has no
-                content filter restrictions on @ symbols.
+                Disabled for the current direct model provider configuration.
               </p>
             </div>
           </TooltipContent>

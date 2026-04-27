@@ -14,7 +14,8 @@ attachments: [batch-context.json]
 
 ## CRITICAL: Script Path
 ```bash
-SCRIPTS=/Users/kevinlin/clawOSS/scripts
+: "${CLAWOSS_PROJECT_DIR:?Set CLAWOSS_PROJECT_DIR to the ClawOSS project root}"
+SCRIPTS="$CLAWOSS_PROJECT_DIR/scripts"
 ```
 **ALL work MUST happen in `/tmp/clawoss-batch-{timestamp}/`.** NEVER clone to `/tmp/{repo-name}/` or any location outside the `clawoss-` prefix.
 
@@ -22,9 +23,9 @@ SCRIPTS=/Users/kevinlin/clawOSS/scripts
 `web_search` the reviewer's feedback before implementing. Search for the pattern, API, or approach they suggest. `web_fetch` any links in their comments. Don't guess — search first.
 
 ## Skills — Load Before Working
-1. `~/clawOSS/workspace/skills/oss-pr-review-handler/SKILL.md`
-2. `~/clawOSS/workspace/skills/verification-before-completion/SKILL.md`
-3. `~/clawOSS/workspace/skills/oss-review/SKILL.md`
+1. `$CLAWOSS_PROJECT_DIR/workspace/skills/oss-pr-review-handler/SKILL.md`
+2. `$CLAWOSS_PROJECT_DIR/workspace/skills/verification-before-completion/SKILL.md`
+3. `$CLAWOSS_PROJECT_DIR/workspace/skills/oss-review/SKILL.md`
 
 ## Performance Standards
 For each PR: implement EXACTLY what the reviewer asked. `web_search` any pattern or API they suggest. Run tests after each change. Verify before pushing. If a change fails, try a different approach — don't skip the PR.
@@ -36,7 +37,8 @@ Read the attached `batch-context.json` for the list of PRs to process.
 
 ### Setup
 ```bash
-SCRIPTS=/Users/kevinlin/clawOSS/scripts
+: "${CLAWOSS_PROJECT_DIR:?Set CLAWOSS_PROJECT_DIR to the ClawOSS project root}"
+SCRIPTS="$CLAWOSS_PROJECT_DIR/scripts"
 BATCH_WORKDIR=/tmp/clawoss-batch-$(date +%s)
 mkdir -p $BATCH_WORKDIR
 ```

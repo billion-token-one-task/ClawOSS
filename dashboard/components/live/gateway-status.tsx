@@ -100,7 +100,7 @@ export function GatewayStatus({
         </div>
         <div className="flex justify-between">
           <span className="stat-label">Model</span>
-          <span className="text-foreground/60">kimi-coding/k2p5</span>
+          <span className="text-foreground/60">openai/gpt-5.5</span>
         </div>
         <div className="flex justify-between">
           <span className="stat-label">Auth</span>

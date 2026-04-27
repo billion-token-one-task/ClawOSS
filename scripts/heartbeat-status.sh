@@ -10,8 +10,44 @@ if [ "${1:-}" = "--help" ]; then
   exit 0
 fi
 
-PROJECT_DIR="${PROJECT_DIR:-/Users/kevinlin/clawOSS}"
-MEMORY_DIR="$PROJECT_DIR/workspace/memory"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+DEFAULT_PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+PROJECT_DIR="${CLAWOSS_PROJECT_DIR:-${PROJECT_DIR:-$DEFAULT_PROJECT_DIR}}"
+WORKSPACE_DIR="${CLAWOSS_WORKSPACE:-${WORKSPACE_DIR:-$PROJECT_DIR/workspace}}"
+MEMORY_DIR="$WORKSPACE_DIR/memory"
+CYCLE_FILE="$MEMORY_DIR/heartbeat-cycles.json"
+
+mkdir -p "$MEMORY_DIR"
+
+CYCLE_COUNT=$(python3 - "$CYCLE_FILE" <<'PY'
+import datetime as dt
+import json
+import os
+import sys
+
+path = sys.argv[1]
+now = dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z")
+try:
+    with open(path) as handle:
+        data = json.load(handle)
+except (OSError, json.JSONDecodeError):
+    data = {}
+
+count = int(data.get("cycle_count") or 0) + 1
+data["cycle_count"] = count
+data.setdefault("first_cycle_at", now)
+data["last_cycle_at"] = now
+data["updated_at"] = now
+
+tmp_path = f"{path}.tmp"
+os.makedirs(os.path.dirname(path), exist_ok=True)
+with open(tmp_path, "w") as handle:
+    json.dump(data, handle, indent=2)
+    handle.write("\n")
+os.replace(tmp_path, path)
+print(count)
+PY
+)
 
 # Wake state (macOS grep doesn't support -P, use sed instead)
 WAKE_STATE=$(cat "$MEMORY_DIR/wake-state.md" 2>/dev/null || echo "unavailable")
@@ -89,6 +125,7 @@ PENDING_SPAWNS=${PENDING_SPAWNS:-0}
 
 cat <<ENDJSON
 {
+  "cycle_count": $CYCLE_COUNT,
   "consecutive_wakes": $CONSECUTIVE,
   "errors_this_hour": $ERRORS,
   "lock_files": $LOCK_COUNT,

@@ -4,7 +4,8 @@
 # Exit 0 always
 
 REPO="${1:?Usage: unlock-repo.sh <owner/repo>}"
-PROJECT_DIR="${PROJECT_DIR:-/Users/kevinlin/clawOSS}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="${CLAWOSS_PROJECT_DIR:-${PROJECT_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}}"
 OWNER="${REPO%%/*}"
 REPO_NAME="${REPO##*/}"
 

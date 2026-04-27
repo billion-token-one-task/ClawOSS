@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { db, ensureDb } from "@/lib/db";
 import { heartbeats, pullRequests, prReviews, metricsTokens, agentLogs, conversationMessages, subagentRuns } from "@/lib/schema";
 import { desc, gte, sql, eq } from "drizzle-orm";
+import { computeTokenCost, DEFAULT_MODEL } from "@/lib/cost-models";
 
 export async function GET() {
   try {
@@ -108,9 +109,9 @@ export async function GET() {
       // Estimate 70/30 input/output split for fallback
       inputTokensToday = Math.round(tokensUsedToday * 0.7);
       outputTokensToday = tokensUsedToday - inputTokensToday;
-      // Estimate cost using Kimi K2.5 average ($1.8/M tokens)
+      // Estimate fallback cost with the default model pricing.
       if (tokensUsedToday > 0 && costToday === 0) {
-        costToday = tokensUsedToday * (1.8 / 1_000_000);
+        costToday = computeTokenCost(inputTokensToday, outputTokensToday, DEFAULT_MODEL);
       }
     }
 

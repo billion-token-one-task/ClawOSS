@@ -31,11 +31,11 @@ if [ -z "${GITHUB_TOKEN:-}" ]; then
     echo "Error: GITHUB_TOKEN not set in .env"
     exit 1
 fi
-if [ -z "${KIMI_API_KEY:-}" ]; then
-    echo "Error: KIMI_API_KEY not set in .env (required — OpenRouter is not supported due to content filter)"
+if [ -z "${OPENAI_API_KEY:-}" ] && [ -z "${KIMI_API_KEY:-}" ]; then
+    echo "Error: set OPENAI_API_KEY for the default model, or KIMI_API_KEY when using a Kimi model"
     exit 1
 fi
-echo "[OK] API keys configured"
+echo "[OK] Model API key configured"
 
 # Configure git identity
 GITHUB_USERNAME="${GITHUB_USERNAME:-BillionClaw}"
@@ -83,20 +83,38 @@ sed \
 
 # Inject env vars into deployed config (via env vars, not shell interpolation)
 _CONFIG_PATH="$OPENCLAW_DIR/openclaw.json" \
+_OPENAI_KEY="${OPENAI_API_KEY:-}" \
 _KIMI_KEY="${KIMI_API_KEY:-}" \
+_MINIMAX_KEY="${MINIMAX_API_KEY:-}" \
 _GH_TOKEN="${GITHUB_TOKEN:-}" \
 _DASH_URL="${DASHBOARD_URL:-https://clawoss-dashboard.vercel.app}" \
 _CLAW_KEY="${CLAW_API_KEY:-}" \
+_CLAWOSS_MODEL="${CLAWOSS_MODEL:-openai/gpt-5.5}" \
+_CLAWOSS_FALLBACK_MODEL="${CLAWOSS_FALLBACK_MODEL:-openai/gpt-5.5}" \
+_CLAWOSS_DRY_RUN="${CLAWOSS_DRY_RUN:-false}" \
+_CLAWOSS_TOKEN_BUDGET="${CLAWOSS_TOKEN_BUDGET:-1000000}" \
+_CLAWOSS_COST_BUDGET="${CLAWOSS_COST_BUDGET:-50.00}" \
+_CLAWOSS_PROJECT_DIR="$PROJECT_DIR" \
+_CLAWOSS_WORKSPACE="$WORKSPACE_DIR" \
 python3 -c "
 import json, os
 config_path = os.environ['_CONFIG_PATH']
 with open(config_path) as f: c = json.load(f)
 c.setdefault('env', {})
 env_vars = {
+    'OPENAI_API_KEY': os.environ.get('_OPENAI_KEY', ''),
     'KIMI_API_KEY': os.environ.get('_KIMI_KEY', ''),
+    'MINIMAX_API_KEY': os.environ.get('_MINIMAX_KEY', ''),
     'GITHUB_TOKEN': os.environ.get('_GH_TOKEN', ''),
     'DASHBOARD_URL': os.environ.get('_DASH_URL', ''),
     'CLAW_API_KEY': os.environ.get('_CLAW_KEY', ''),
+    'CLAWOSS_MODEL': os.environ.get('_CLAWOSS_MODEL', ''),
+    'CLAWOSS_FALLBACK_MODEL': os.environ.get('_CLAWOSS_FALLBACK_MODEL', ''),
+    'CLAWOSS_DRY_RUN': os.environ.get('_CLAWOSS_DRY_RUN', ''),
+    'CLAWOSS_TOKEN_BUDGET': os.environ.get('_CLAWOSS_TOKEN_BUDGET', ''),
+    'CLAWOSS_COST_BUDGET': os.environ.get('_CLAWOSS_COST_BUDGET', ''),
+    'CLAWOSS_PROJECT_DIR': os.environ.get('_CLAWOSS_PROJECT_DIR', ''),
+    'CLAWOSS_WORKSPACE': os.environ.get('_CLAWOSS_WORKSPACE', ''),
 }
 for k, v in env_vars.items():
     if v:

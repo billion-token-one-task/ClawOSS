@@ -16,9 +16,10 @@ attachments: [trust-repos.md, pr-ledger.md]
 ## CRITICAL: Script Path
 **EVERY bash block MUST start with this line:**
 ```bash
-SCRIPTS=/Users/kevinlin/clawOSS/scripts
+: "${CLAWOSS_PROJECT_DIR:?Set CLAWOSS_PROJECT_DIR to the ClawOSS project root}"
+SCRIPTS="$CLAWOSS_PROJECT_DIR/scripts"
 ```
-All ClawOSS utility scripts are at this absolute path. You run in /tmp — relative paths WILL NOT WORK.
+All ClawOSS utility scripts are under `$CLAWOSS_PROJECT_DIR/scripts`. You run in /tmp, so relative paths to the project root will not work.
 
 ## Web Search — Use Every Cycle
 You have `web_search` and `web_fetch`. Use them to discover repos and validate candidates:
@@ -29,9 +30,9 @@ You have `web_search` and `web_fetch`. Use them to discover repos and validate c
 
 ## Skills — Load These Before Working
 You have skills available. **Read each SKILL.md file** with the `read` tool:
-1. **`~/clawOSS/workspace/skills/oss-discover/SKILL.md`** — The full discovery workflow with API queries, scoring, and 7-niche rotation. Read this FIRST — it has the exact queries to run.
-2. **`~/clawOSS/workspace/skills/oss-triage/SKILL.md`** — Scoring rubric for candidates. Read when scoring.
-3. **`~/clawOSS/workspace/skills/repo-analyzer/SKILL.md`** — Repo health assessment. Read when evaluating new repos.
+1. **`$CLAWOSS_PROJECT_DIR/workspace/skills/oss-discover/SKILL.md`** — The full discovery workflow with API queries, scoring, and 7-niche rotation. Read this FIRST — it has the exact queries to run.
+2. **`$CLAWOSS_PROJECT_DIR/workspace/skills/oss-triage/SKILL.md`** — Scoring rubric for candidates. Read when scoring.
+3. **`$CLAWOSS_PROJECT_DIR/workspace/skills/repo-analyzer/SKILL.md`** — Repo health assessment. Read when evaluating new repos.
 Load skills proactively — they have exact GitHub API queries and scoring formulas.
 
 ## Task Prompt
@@ -43,7 +44,8 @@ Your ONLY job is to find repos and issues worth targeting. You do NOT write code
 
 ### Setup
 ```bash
-SCRIPTS=/Users/kevinlin/clawOSS/scripts
+: "${CLAWOSS_PROJECT_DIR:?Set CLAWOSS_PROJECT_DIR to the ClawOSS project root}"
+SCRIPTS="$CLAWOSS_PROJECT_DIR/scripts"
 ```
 
 ### Operating Loop
@@ -101,7 +103,8 @@ gh api "/search/issues?q=is:issue+is:open+label:good-first-issue+stars:>200+crea
 For each promising repo (score >= 8 before direction analysis), run the direction analysis script:
 
 ```bash
-SCRIPTS=/Users/kevinlin/clawOSS/scripts
+: "${CLAWOSS_PROJECT_DIR:?Set CLAWOSS_PROJECT_DIR to the ClawOSS project root}"
+SCRIPTS="$CLAWOSS_PROJECT_DIR/scripts"
 DIRECTION=$(bash $SCRIPTS/analyze-repo-direction.sh {owner}/{repo})
 echo "$DIRECTION" | python3 -c "
 import json,sys; d=json.load(sys.stdin)

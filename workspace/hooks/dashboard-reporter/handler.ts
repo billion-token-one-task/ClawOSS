@@ -1,9 +1,30 @@
 const DASHBOARD_URL = process.env.DASHBOARD_URL || "https://clawoss-dashboard.vercel.app";
 const AGENT_ID = "clawoss";
 const GITHUB_USERNAME = "BillionClaw";
-// Kimi Code K2.5 direct API pricing: $0.60/M input, $3.00/M output (switched in commit c98540f)
-const INPUT_COST_PER_TOKEN = 0.6 / 1_000_000;
-const OUTPUT_COST_PER_TOKEN = 3.0 / 1_000_000;
+const CLAWOSS_MODEL = process.env.CLAWOSS_MODEL || "openai/gpt-5.5";
+const CLAWOSS_PROVIDER =
+  process.env.CLAWOSS_PROVIDER || CLAWOSS_MODEL.split("/")[0] || "openai";
+
+const MODEL_COSTS: Record<
+  string,
+  { inputCostPerToken: number; outputCostPerToken: number }
+> = {
+  "openai/gpt-5.5": {
+    inputCostPerToken: 5.0 / 1_000_000,
+    outputCostPerToken: 30.0 / 1_000_000,
+  },
+  "kimi-coding/k2p5": {
+    inputCostPerToken: 0.6 / 1_000_000,
+    outputCostPerToken: 3.0 / 1_000_000,
+  },
+  "minimax/MiniMax-M2.7": {
+    inputCostPerToken: 0.3 / 1_000_000,
+    outputCostPerToken: 1.2 / 1_000_000,
+  },
+};
+const MODEL_COST = MODEL_COSTS[CLAWOSS_MODEL] || MODEL_COSTS["openai/gpt-5.5"];
+const INPUT_COST_PER_TOKEN = MODEL_COST.inputCostPerToken;
+const OUTPUT_COST_PER_TOKEN = MODEL_COST.outputCostPerToken;
 
 let accumulatedInputTokens = 0;
 let accumulatedOutputTokens = 0;
@@ -168,7 +189,7 @@ async function postState(apiKey: string): Promise<void> {
         metadata: {
           agent_id: AGENT_ID,
           tool_calls: toolCallCount,
-          model: "kimi-coding/k2p5",
+          model: CLAWOSS_MODEL,
         },
       }),
       signal: controller.signal,
@@ -547,7 +568,7 @@ const handler = async (event: {
           metadata: {
             session_key: sessionId,
             tool_calls: toolCallCount,
-            model: "kimi-coding/k2p5",
+            model: CLAWOSS_MODEL,
             repos: Array.from(reposUsed),
             skill: lastSkillName,
           },
@@ -567,8 +588,8 @@ const handler = async (event: {
             metrics: [
               {
                 channel: "agent",
-                provider: "kimi-direct",
-                model: "kimi-coding/k2p5",
+                provider: CLAWOSS_PROVIDER,
+                model: CLAWOSS_MODEL,
                 inputTokens: accumulatedInputTokens,
                 outputTokens: accumulatedOutputTokens,
                 costUsd: Math.round(costUsd * 1_000_000) / 1_000_000,

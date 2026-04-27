@@ -6,6 +6,7 @@
 DASHBOARD_URL="${DASHBOARD_URL:-https://clawoss-dashboard.vercel.app}"
 API_KEY="${CLAW_API_KEY:?Set CLAW_API_KEY env var}"
 SESSION_ID="${CLAUDE_SESSION_ID:-agent-session}"
+CLAWOSS_MODEL="${CLAWOSS_MODEL:-openai/gpt-5.5}"
 
 # Read the hook input from stdin
 INPUT=$(cat 2>/dev/null || echo '{}')
@@ -32,6 +33,7 @@ PAYLOAD=$(jq -n \
   --argjson durationMs "$DURATION" \
   --arg ts "$TIMESTAMP" \
   --arg resultContent "$TOOL_OUTPUT_RAW" \
+  --arg model "$CLAWOSS_MODEL" \
   '{
     messages: [
       {
@@ -42,7 +44,7 @@ PAYLOAD=$(jq -n \
         toolCallId: $toolCallId,
         durationMs: $durationMs,
         timestamp: $ts,
-        metadata: { agent_id: "clawoss", model: "kimi-coding/k2p5" }
+        metadata: { agent_id: "clawoss", model: $model }
       },
       {
         sessionId: $sid,

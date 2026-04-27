@@ -6,8 +6,9 @@ set -u
 
 PASSED=0
 FAILED=0
-SCRIPTS="/Users/kevinlin/clawOSS/scripts"
-MEMORY="/Users/kevinlin/clawOSS/workspace/memory"
+SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"
+PROJECT_DIR="$(cd "$SCRIPTS/.." && pwd)"
+MEMORY="$PROJECT_DIR/workspace/memory"
 
 pass() { echo "  ✅ $1"; PASSED=$((PASSED + 1)); }
 fail() { echo "  ❌ $1"; FAILED=$((FAILED + 1)); }

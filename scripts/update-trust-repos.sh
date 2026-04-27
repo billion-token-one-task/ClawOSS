@@ -6,7 +6,8 @@
 
 ACTION="${1:?Usage: update-trust-repos.sh <action> <owner/repo> [--score N] [--reason <text>]}"
 REPO="${2:?Usage: update-trust-repos.sh <action> <owner/repo>}"
-PROJECT_DIR="${PROJECT_DIR:-/Users/kevinlin/clawOSS}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="${CLAWOSS_PROJECT_DIR:-${PROJECT_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}}"
 TRUST_FILE="$PROJECT_DIR/workspace/memory/trust-repos.md"
 SCORE=""
 REASON=""

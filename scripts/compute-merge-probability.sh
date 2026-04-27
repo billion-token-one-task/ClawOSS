@@ -6,7 +6,8 @@
 
 REPO="${1:?Usage: compute-merge-probability.sh <owner/repo> <issue_number> [--type TYPE]}"
 ISSUE="${2:?Usage: compute-merge-probability.sh <owner/repo> <issue_number>}"
-PROJECT_DIR="${PROJECT_DIR:-/Users/kevinlin/clawOSS}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="${CLAWOSS_PROJECT_DIR:-${PROJECT_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}}"
 TYPE="fix"
 
 shift 2

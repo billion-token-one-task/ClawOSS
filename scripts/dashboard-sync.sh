@@ -11,8 +11,19 @@
 #
 # Usage: nohup bash scripts/dashboard-sync.sh > /tmp/dashboard-sync.log 2>&1 &
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="${CLAWOSS_PROJECT_DIR:-${PROJECT_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}}"
+WORKSPACE_DIR="${CLAWOSS_WORKSPACE:-$PROJECT_DIR/workspace}"
+
+if [ -f "$PROJECT_DIR/.env" ]; then
+  set -a
+  source "$PROJECT_DIR/.env"
+  set +a
+fi
+
 URL="${DASHBOARD_URL:-https://clawoss-dashboard.vercel.app}"
 KEY="${CLAW_API_KEY:?Set CLAW_API_KEY env var}"
+CLAWOSS_MODEL="${CLAWOSS_MODEL:-openai/gpt-5.5}"
 # Sessions dir: check for the clawoss agent sessions, with fallback
 if [ -d "$HOME/.openclaw/agents/clawoss/sessions" ]; then
   DIR="$HOME/.openclaw/agents/clawoss/sessions"
@@ -23,14 +34,55 @@ else
 fi
 INTERVAL=10
 # Use persistent offset dir under workspace to survive reboots (not /tmp)
-SYNC_STATE_DIR="${CLAWOSS_WORKSPACE:-$HOME/clawOSS/workspace}/.sync-state"
+SYNC_STATE_DIR="$WORKSPACE_DIR/.sync-state"
 OFFSET_DIR="${SYNC_STATE_DIR}/offsets"
 SESSION_MAP="${SYNC_STATE_DIR}/session-map.json"
 LOCK_FILE="${SYNC_STATE_DIR}/dashboard-sync.pid"
-SCRIPT_PATH="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+CYCLE_FILE="$WORKSPACE_DIR/memory/heartbeat-cycles.json"
+BUDGET_STATUS_FILE="$WORKSPACE_DIR/memory/budget-status.json"
+SCRIPT_PATH="$SCRIPT_DIR/$(basename "$0")"
 mkdir -p "$OFFSET_DIR" "$SYNC_STATE_DIR"
 
 log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*"; }
+
+json_compact_or_empty() {
+  _JSON_INPUT="${1:-}" python3 - <<'PY'
+import json
+import os
+
+raw = os.environ.get("_JSON_INPUT", "").strip()
+try:
+    data = json.loads(raw) if raw else {}
+except json.JSONDecodeError:
+    data = {}
+print(json.dumps(data, separators=(",", ":")))
+PY
+}
+
+read_cycle_count() {
+  python3 - "$CYCLE_FILE" <<'PY' 2>/dev/null || echo 0
+import json
+import sys
+
+try:
+    with open(sys.argv[1]) as handle:
+        data = json.load(handle)
+    print(int(data.get("cycle_count") or 0))
+except Exception:
+    print(0)
+PY
+}
+
+read_budget_status() {
+  local raw=""
+  if [ -x "$SCRIPT_DIR/budget-check.sh" ]; then
+    raw=$(PROJECT_DIR="$PROJECT_DIR" CLAWOSS_PROJECT_DIR="$PROJECT_DIR" CLAWOSS_WORKSPACE="$WORKSPACE_DIR" bash "$SCRIPT_DIR/budget-check.sh" --local-only 2>/dev/null || true)
+  fi
+  if [ -z "$raw" ] && [ -f "$BUDGET_STATUS_FILE" ]; then
+    raw=$(cat "$BUDGET_STATUS_FILE" 2>/dev/null || echo '{}')
+  fi
+  json_compact_or_empty "$raw"
+}
 
 # --- PID lock: prevent duplicate instances ---
 if [ -f "$LOCK_FILE" ]; then
@@ -92,9 +144,11 @@ build_session_map
 log "Session map built: $(_SESSION_MAP="$SESSION_MAP" python3 -c "import json, os; d=json.load(open(os.environ['_SESSION_MAP'])); subs=[v for v in d.values() if v['isSubagent']]; print(f'{len(d)} sessions, {len(subs)} subagents')" 2>/dev/null || echo 'error')"
 
 CYCLE=0
+BUDGET_STATUS="$(read_budget_status)"
 
 while true; do
   CYCLE=$((CYCLE + 1))
+  CYCLE_COUNT="$(read_cycle_count)"
 
   # --- Self-update check every 6 cycles (60 seconds) ---
   if [ $((CYCLE % 6)) -eq 0 ]; then
@@ -109,6 +163,7 @@ while true; do
   # Rebuild session map every 6 cycles (60 seconds) to pick up new sessions
   if [ $((CYCLE % 6)) -eq 1 ]; then
     build_session_map
+    BUDGET_STATUS="$(read_budget_status)"
   fi
 
   # PR Ledger sync handled by launchd (com.clawoss.pr-ledger-sync) every 60s
@@ -130,8 +185,10 @@ while true; do
     --argjson sessions "$SESSIONS" \
     --argjson active "$LOCKS" \
     --argjson totalBytes "${BYTES:-0}" \
+    --argjson cycleCount "${CYCLE_COUNT:-0}" \
+    --argjson budgetStatus "$BUDGET_STATUS" \
     --arg source "dashboard-sync.sh" \
-    '{sessionCount:$sessions, activeCount:$active, totalBytes:$totalBytes, source:$source}' 2>/dev/null || echo '{}')
+    '{sessionCount:$sessions, activeCount:$active, totalBytes:$totalBytes, cycle_count:$cycleCount, budget_status:$budgetStatus, source:$source}' 2>/dev/null || echo '{}')
 
   curl -s -m 8 -X POST "$URL/api/ingest/heartbeat" \
     -H "Authorization: Bearer $KEY" \
@@ -142,7 +199,7 @@ while true; do
       --argjson metadata "$METADATA" \
       '{status:$status, currentTask:$currentTask, metadata:$metadata}')" > /dev/null 2>&1
 
-  log "heartbeat: status=$ST sessions=$SESSIONS active=$LOCKS bytes=$BYTES"
+  log "heartbeat: status=$ST sessions=$SESSIONS active=$LOCKS bytes=$BYTES cycle_count=${CYCLE_COUNT:-0}"
 
   # --- Token metrics: extract usage data from JSONL and POST to /api/ingest/metrics ---
   for f in "$DIR"/*.jsonl; do
@@ -166,9 +223,18 @@ while true; do
     NEW_COUNT=$((TOTAL_LINES - TOKEN_PREV))
     [ "$NEW_COUNT" -gt 200 ] && NEW_COUNT=200 && TOKEN_PREV=$((TOTAL_LINES - 200))
 
-    METRICS_PAYLOAD=$(tail -n "$NEW_COUNT" "$f" 2>/dev/null | _SID="$SID" python3 -c "
+    METRICS_PAYLOAD=$(tail -n "$NEW_COUNT" "$f" 2>/dev/null | _SID="$SID" _BUDGET_STATUS="$BUDGET_STATUS" _CYCLE_COUNT="${CYCLE_COUNT:-0}" _CLAWOSS_MODEL="$CLAWOSS_MODEL" python3 -c "
 import json, sys, os
 sid = os.environ['_SID']
+default_model = os.environ.get('_CLAWOSS_MODEL') or 'openai/gpt-5.5'
+try:
+    budget_status = json.loads(os.environ.get('_BUDGET_STATUS') or '{}')
+except json.JSONDecodeError:
+    budget_status = {}
+try:
+    cycle_count = int(os.environ.get('_CYCLE_COUNT') or 0)
+except ValueError:
+    cycle_count = 0
 metrics = []
 for line in sys.stdin:
     line = line.strip()
@@ -194,11 +260,12 @@ for line in sys.stdin:
     metrics.append({
         'inputTokens': inp,
         'outputTokens': out,
-        'model': model or 'kimi-coding/k2p5',
+        'model': model or default_model,
         'channel': sid
     })
 if metrics:
-    print(json.dumps({'metrics': metrics}))
+    payload = {'metrics': metrics, 'cycleCount': cycle_count, 'budgetStatus': budget_status}
+    print(json.dumps(payload))
 " 2>/dev/null)
 
     if [ -n "$METRICS_PAYLOAD" ]; then

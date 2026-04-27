@@ -137,7 +137,7 @@ export function MetricCards({
     {
       label: "Cost/24h",
       value: formatCost(costToday),
-      sub: costToday > 0 ? "kimi k2.5" : null,
+      sub: costToday > 0 ? "runtime model" : null,
       bar: { value: costToday, max: 5 },
     },
     {

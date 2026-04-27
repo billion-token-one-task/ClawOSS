@@ -60,7 +60,7 @@ bash scripts/restart.sh
 ║   PRs Merged ···················· 1  (badlogic/pi-mono#2166)      ║
 ║   Time to First PR ·············· 12 minutes autonomous           ║
 ║   Concurrent Sub-Agents ········· 5                               ║
-║   Model ························· Kimi Code k2p5 (direct API)     ║
+║   Model ························· runtime env (default GPT-5.5)   ║
 ║   Content Filter 403s ··········· ZERO (PII sanitizer bypass)     ║
 ║   Peak Throughput ··············· 15 PRs in 85 minutes            ║
 ║                                                                   ║
@@ -76,7 +76,7 @@ bash scripts/restart.sh
 ░                                                                                ░
 ░  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓   ░
 ░  ┃          O P E N C L A W   G A T E W A Y   ( port 18789 )              ┃   ░
-░  ┃                    mode: local · model: kimi-coding/k2p5               ┃   ░
+░  ┃          mode: local · model: ${CLAWOSS_MODEL:-openai/gpt-5.5}          ┃   ░
 ░  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛   ░
 ░                                 ┃                                              ░
 ░                                 ┃ heartbeat every 10m                          ░

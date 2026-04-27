@@ -47,7 +47,7 @@ Skills provide step-by-step specialized instructions. **Load them before each ta
 | `verification-before-completion` | Verifying fixes work | Impl & Followup subagents |
 | `systematic-debugging` | Debugging stuck issues | Impl subagents |
 
-**How**: `read ~/clawOSS/workspace/skills/{name}/SKILL.md` — the skill file has the exact procedure.
+**How**: `read workspace/skills/{name}/SKILL.md` from the ClawOSS project — the skill file has the exact procedure.
 
 ## Safety (non-negotiable)
 - NEVER push to main/master or force-push
@@ -60,6 +60,11 @@ Skills provide step-by-step specialized instructions. **Load them before each ta
 - Max 3 follow-up rounds per PR -- after 3, politely disengage
 - Read CONTRIBUTING.md before first PR to any repo
 - Run target repo's test suite before submitting
+
+## Dry-Run Mode
+When `CLAWOSS_DRY_RUN=true`, the agent still runs discovery, triage, repository analysis, implementation, tests, review, and result processing normally. The only behavior that changes is external publication: no GitHub PR is created.
+
+Before any `gh pr create`, run `bash ../scripts/dry-run-gate.sh` with the repo, title, body file or body, head branch, base branch, and issue URL. If the gate exits 1, treat that as an intentional dry-run stop: append the would-be PR details to `memory/dry-run-log.md`, do not call `gh pr create`, and report the result as dry-run logged rather than submitted. If `CLAWOSS_DRY_RUN` is false or unset, the gate exits 0 and PR creation may proceed after all normal safety checks pass.
 
 ## PR Conflict & Supersession Prevention (non-negotiable)
 Before starting work on ANY issue, verify:
@@ -77,7 +82,7 @@ Always check there first. Always verify default branch with `gh api repos/{owner
 **CLA/DCO**: CLAs require manual signing by the account owner. The agent cannot sign CLAs.
 **Issue assignment repos**: Some repos auto-close unassigned PRs. Comment on the issue first if `memory/repos/` notes say so.
 
-## Repo Health Gate (mandatory -- run `/Users/kevinlin/clawOSS/scripts/repo-health-check.sh`)
+## Repo Health Gate (mandatory -- run `$CLAWOSS_PROJECT_DIR/scripts/repo-health-check.sh`)
 - Stars >= 200, last push < 2 weeks, merged PRs in 30d > 0
 - Avg merge time <= 14 days, review rate > 50%, open PRs < 50
 - Cache results in `memory/repos/` for 24 hours. Skip repos that fail ANY check.

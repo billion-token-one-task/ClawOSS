@@ -39,7 +39,7 @@ Read `memory/trust-repos.md` Deprioritized section. If the repo appears there AN
 ### 0c. Repo Health Gate (MANDATORY — check BEFORE spending triage tokens)
 **We only contribute to repos that will actually review and merge our work.**
 
-Run `/Users/kevinlin/clawOSS/scripts/repo-health-check.sh {owner}/{repo}` or quick-check via `gh api`
+Run `$CLAWOSS_PROJECT_DIR/scripts/repo-health-check.sh {owner}/{repo}` or quick-check via `gh api`
 (use cached results from `memory/repos/` if available and < 24 hours old):
 
 ```bash
@@ -59,7 +59,7 @@ gh pr list --repo {owner}/{repo} --state all --json comments,reviews --limit 20
 gh pr list --repo {owner}/{repo} --state open --json number --jq 'length'
 ```
 
-**HARD SKIP if `/Users/kevinlin/clawOSS/scripts/repo-health-check.sh` exits 1.** The script checks (with tiered thresholds for large repos):
+**HARD SKIP if `$CLAWOSS_PROJECT_DIR/scripts/repo-health-check.sh` exits 1.** The script checks (with tiered thresholds for large repos):
 - Stars < 200
 - No commits in last 2 weeks
 - 0 merged PRs in last 30 days

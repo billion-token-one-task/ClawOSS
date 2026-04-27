@@ -8,6 +8,13 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 AGENT_ID="clawoss"
 WORKSPACE_DIR="$PROJECT_DIR/workspace"
 
+if [ -f "$PROJECT_DIR/.env" ]; then
+    set -a
+    source "$PROJECT_DIR/.env"
+    set +a
+fi
+CLAWOSS_MODEL="${CLAWOSS_MODEL:-openai/gpt-5.5}"
+
 # Verify setup
 if [ ! -L "$HOME/.openclaw/workspace" ]; then
     echo "Error: workspace not linked. Run 'npm run setup' first."
@@ -21,7 +28,7 @@ else
     echo "Registering agent '$AGENT_ID'..."
     openclaw agents add "$AGENT_ID" \
         --workspace "$WORKSPACE_DIR" \
-        --model "kimi-coding/k2p5" \
+        --model "$CLAWOSS_MODEL" \
         --non-interactive
     echo "Agent '$AGENT_ID' registered"
 fi

@@ -52,6 +52,8 @@ if [ -f "$PROJECT_DIR/.env" ]; then
 else
     echo "[INFO] No .env found — using existing env vars"
 fi
+CLAWOSS_MODEL="${CLAWOSS_MODEL:-openai/gpt-5.5}"
+CLAWOSS_FALLBACK_MODEL="${CLAWOSS_FALLBACK_MODEL:-openai/gpt-5.5}"
 
 # ── 2. Git identity ──────────────────────────────────────────────────
 GITHUB_USERNAME="${GITHUB_USERNAME:-BillionClaw}"
@@ -99,12 +101,20 @@ REPO_CONFIG_RESOLVED=$(sed \
 
 _REPO_CONFIG="$REPO_CONFIG_RESOLVED" \
 _DEPLOYED="$DEPLOYED_CONFIG" \
+_OPENAI_KEY="${OPENAI_API_KEY:-}" \
 _KIMI_KEY="${KIMI_API_KEY:-}" \
 _MINIMAX_KEY="${MINIMAX_API_KEY:-}" \
 _GH_TOKEN="${GITHUB_TOKEN:-}" \
 _DASH_URL="${DASHBOARD_URL:-https://clawoss-dashboard.vercel.app}" \
 _CLAW_KEY="${CLAW_API_KEY:-}" \
 _OPENROUTER_KEY="${OPENROUTER_API_KEY:-}" \
+_CLAWOSS_MODEL="${CLAWOSS_MODEL}" \
+_CLAWOSS_FALLBACK_MODEL="${CLAWOSS_FALLBACK_MODEL}" \
+_CLAWOSS_DRY_RUN="${CLAWOSS_DRY_RUN:-false}" \
+_CLAWOSS_TOKEN_BUDGET="${CLAWOSS_TOKEN_BUDGET:-1000000}" \
+_CLAWOSS_COST_BUDGET="${CLAWOSS_COST_BUDGET:-50.00}" \
+_CLAWOSS_PROJECT_DIR="$PROJECT_DIR" \
+_CLAWOSS_WORKSPACE="$WORKSPACE_DIR" \
 python3 -c "
 import json, os
 
@@ -131,12 +141,20 @@ merged = deep_merge(deployed, repo_config)
 # Inject env vars (non-empty only)
 merged.setdefault('env', {})
 env_map = {
+    'OPENAI_API_KEY': os.environ.get('_OPENAI_KEY', ''),
     'KIMI_API_KEY': os.environ.get('_KIMI_KEY', ''),
     'MINIMAX_API_KEY': os.environ.get('_MINIMAX_KEY', ''),
     'GITHUB_TOKEN': os.environ.get('_GH_TOKEN', ''),
     'DASHBOARD_URL': os.environ.get('_DASH_URL', ''),
     'CLAW_API_KEY': os.environ.get('_CLAW_KEY', ''),
     'OPENROUTER_API_KEY': os.environ.get('_OPENROUTER_KEY', ''),
+    'CLAWOSS_MODEL': os.environ.get('_CLAWOSS_MODEL', ''),
+    'CLAWOSS_FALLBACK_MODEL': os.environ.get('_CLAWOSS_FALLBACK_MODEL', ''),
+    'CLAWOSS_DRY_RUN': os.environ.get('_CLAWOSS_DRY_RUN', ''),
+    'CLAWOSS_TOKEN_BUDGET': os.environ.get('_CLAWOSS_TOKEN_BUDGET', ''),
+    'CLAWOSS_COST_BUDGET': os.environ.get('_CLAWOSS_COST_BUDGET', ''),
+    'CLAWOSS_PROJECT_DIR': os.environ.get('_CLAWOSS_PROJECT_DIR', ''),
+    'CLAWOSS_WORKSPACE': os.environ.get('_CLAWOSS_WORKSPACE', ''),
 }
 for k, v in env_map.items():
     if v:
@@ -316,7 +334,7 @@ echo "[OK] Gateway stopped"
 
 # ── 13. Start gateway (prefer install for launchd, fallback to run) ───
 # `gateway install` creates/updates the launchd plist and loads it.
-# The plist has all env vars baked in (KIMI_API_KEY, GITHUB_TOKEN, etc.)
+# The plist has all env vars baked in (model API keys, GITHUB_TOKEN, etc.)
 # `gateway run &` is a fallback that inherits the current shell env.
 if openclaw gateway install 2>/dev/null; then
     echo "[OK] Gateway installed via launchd"
@@ -414,7 +432,7 @@ fi
 # ── Summary ───────────────────────────────────────────────────────────
 echo ""
 echo "=== ClawOSS V10 Running ==="
-echo "  Model: minimax/m2.7 (MiniMax M2.7, 204k context) + kimi-coding/k2p5 fallback"
+echo "  Model: $CLAWOSS_MODEL (fallback: $CLAWOSS_FALLBACK_MODEL)"
 echo "  Dashboard: https://clawoss-dashboard.vercel.app"
 echo "  Slots: 3 always-on (scout + PR monitor + PR analyst) + 10 impl/followup = 13"
 echo "  Heartbeat: 5m"

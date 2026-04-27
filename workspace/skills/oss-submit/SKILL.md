@@ -46,7 +46,15 @@ This prevents the 5x-duplicate-on-instructor and 3x-duplicate-on-taskcoach incid
 1. Push branch to fork (or origin if write access)
 2. **Verify target branch:** `gh api repos/{owner}/{repo} --jq '.default_branch'` — create PR against THIS branch, not hardcoded 'main' or 'master'. Wrong target = instant close.
 3. **PR template check:** `ls .github/PULL_REQUEST_TEMPLATE.md .github/PULL_REQUEST_TEMPLATE/ 2>/dev/null` — if a template exists, use its structure (fill in sections, check checkboxes). If not, use our format below.
-4. Create PR using `gh pr create --base $DEFAULT_BRANCH`:
+4. Run dry-run gate before PR creation:
+   ```bash
+   if ! bash "${SCRIPTS:?Set SCRIPTS to the ClawOSS scripts directory}/dry-run-gate.sh" --repo OWNER/REPO --head "$BRANCH" --base "$DEFAULT_BRANCH" --title "$PR_TITLE" --body "$PR_BODY" --issue "https://github.com/OWNER/REPO/issues/ISSUE_NUMBER"; then
+     echo "CLAWOSS_DRY_RUN=true; PR details logged to memory/dry-run-log.md"
+     exit 0
+   fi
+   ```
+   Exit 1 from this gate is intentional when `CLAWOSS_DRY_RUN=true`; do not call `gh pr create` after it.
+5. Create PR using `gh pr create --base $DEFAULT_BRANCH`:
    - Title: `{type}(scope): description` following Conventional Commits — type must match contribution
    - Body: write like a developer, not an AI. Be terse (3-5 sentences). No filler.
      - **AI tells (NEVER USE)**: "This PR addresses...", "I noticed...", "Upon investigation...",
@@ -80,7 +88,7 @@ This prevents the 5x-duplicate-on-instructor and 3x-duplicate-on-taskcoach incid
    - **Docs/typo fixes**: what was wrong + what's correct now (2-3 sentences total)
    - **Test additions**: what's tested + why it matters (2-3 sentences total)
    - References: "Fixes #<issue-number>" in body
-5. Do NOT mention CLA in PR body. If repo requires CLA, it will be handled separately.
+6. Do NOT mention CLA in PR body. If repo requires CLA, it will be handled separately.
 7. Log submission to memory: repo, issue, PR number, timestamp, contribution type
 8. Report to dashboard via dashboard-reporter skill
 

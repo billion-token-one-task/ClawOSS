@@ -10,6 +10,7 @@ Work queue should have 10+ items. If < 5, run oss-discover IMMEDIATELY.
 **LAZY LOADING**: Do NOT read all memory files at once. Only read files needed for the current step. pr-ledger.md only when dedup checking. trust-repos.md only when scoring. This prevents context bloat.
 **ANTI-DEADLOCK**: Multiple open PRs per repo is OK. The agent MUST NOT idle when work exists.
 **NEVER WAIT**: Do NOT say "monitoring for completion events", "standing by", "waiting for results", or yield. After ANY step, continue to the next step. After step 7, loop to step 2. The heartbeat is an infinite loop with NO pause states.
+**DRY RUN**: Respect `CLAWOSS_DRY_RUN`. If it is `true`, do discovery, triage, implementation, tests, review, and reporting normally, but replace actual PR creation with `bash ../scripts/dry-run-gate.sh` logging to `memory/dry-run-log.md`.
 
 ## Web Search — USE PROACTIVELY
 You have `web_search` and `web_fetch` tools. **Use them aggressively:**
@@ -31,10 +32,10 @@ You have skills loaded. **Read the SKILL.md file** (use the `read` tool) before 
 - **Safety**: Read `safety-checker` skill before any PR submission — it's the final gate.
 - **Context**: `context-manager` skill when context > 40%.
 - **Dashboard**: `dashboard-reporter` skill to report metrics.
-Skills: `~/clawOSS/workspace/skills/{name}/SKILL.md`. Load with `read`.
+Skills: `workspace/skills/{name}/SKILL.md` from the ClawOSS project. Load with `read`.
 
 ## 0. Health Checks
-**0a. Quick status snapshot**: `bash /Users/kevinlin/clawOSS/scripts/heartbeat-status.sh` — shows queue depth, open PRs, locks, always-on status, wake state in one JSON call.
+**0a. Quick status snapshot**: `bash "$CLAWOSS_PROJECT_DIR/scripts/heartbeat-status.sh"` — shows queue depth, open PRs, locks, always-on status, wake state, and cycle count in one JSON call.
 **0a2. Context**: Use the `session_status` tool (NOT a bash command — it's an OpenClaw built-in tool). **>35%: COMPACT IMMEDIATELY** — flush state to memory files, then `/compact`. Do NOT proceed to any other step until context is under 35%. This is the #1 cause of gateway timeouts and stalled cycles.
 **0b. Circuit breakers**: Read wake-state.md (or use heartbeat-status.sh output). If errors_this_hour >= 5, pause 2 minutes then continue (never fully stop). consecutive_wakes is informational only — never use it to skip work.
 **0b2. Cycle guardrails** (prevent runaway cycles and quota burn):
@@ -50,6 +51,12 @@ Parse the response and OBEY all three fields:
 - `avoidRepos`: repos with 2+ PRs and 0 merges — do NOT submit NEW PRs to any of these. But NEVER kill in-progress subagents working on these repos. Let them finish — killing mid-flight wastes the work already done.
 - `reposWithOpenPRs`: repos where we already have open PRs — do NOT submit new PRs, focus on follow-ups instead.
 If curl fails or times out, proceed without dashboard data — the other gates still apply.
+
+**0d. Budget check** (mandatory before spawning new work):
+```bash
+bash ../scripts/budget-check.sh
+```
+Parse the JSON output. If `within_budget` is `false`, log the full JSON to `memory/budget-pauses.md`, skip steps that spawn new implementation or follow-up agents, and continue only with result processing, cleanup, reporting, and safe follow-up observation. Do not create new GitHub PRs or comments while over budget. Resume spawning only after a later budget check returns `within_budget: true`.
 
 ## 0.5. Always-On Subagent Management (scout + PR monitor scan + PR monitor deep + PR analyst)
 Check always-on subagents via `sessions_list`:
@@ -79,7 +86,7 @@ Always-on subagents use 4 slots. Remaining 10 for impl/followup. Total maxConcur
 
 ## 1. Stall Recovery
 Check for stalled sub-agents (no messages >5 min). Kill, re-queue at TOP of work-queue.md, increment errors_this_hour. Mark stalled task as `failed` in `memory/impl-spawn-state.md`. 2 consecutive stalls on same task = SKIP it.
-**Clean stale locks + orphaned state**: `bash /Users/kevinlin/clawOSS/scripts/cleanup-stale-sessions.sh` (removes locks >30min, resets orphaned spawned_pending entries)
+**Clean stale locks + orphaned state**: `bash "$CLAWOSS_PROJECT_DIR/scripts/cleanup-stale-sessions.sh"` (removes locks >30min, resets orphaned spawned_pending entries)
 
 ## 2. Pick New Work (PRIORITY — new PRs before follow-ups)
 
@@ -131,6 +138,9 @@ Count active impl/followup sub-agents (sessions_list, exclude main + always-on s
 **4d.** Quick research via web_search.
 
 ## 5. Spawn Implementation Sub-Agent
+Before any spawn or pre-spawn comment, confirm Step 0d is within budget. If budget is exceeded, do not spawn and do not post the pre-spawn comment.
+When `CLAWOSS_DRY_RUN=true`, spawned implementation agents must still complete implementation and verification, then call `dry-run-gate.sh` instead of creating a PR.
+
 **5a. Pre-spawn comment (score >= 8, or >= 6 for trusted repos):** Post brief comment: `gh issue comment {issue} --repo {owner}/{repo} --body "Looking into this — [1-sentence approach]. Happy to submit a fix."` Skip for lower scores.
 **5b.** Use the `read` tool to load `templates/subagent-implementation.md` from disk NOW (do NOT reuse cached content). Substitute `{repo}`, `{issue}`, `{title}` in the content. Spawn: `sessions_spawn(task: {THE_SUBSTITUTED_CONTENT}, label: "{repo}#{issue}", ...)`. Always re-read the template for EVERY spawn — files change between cycles. Pass repo conventions + issue details as attachments.
 **IMMEDIATELY mark issue as `spawned_pending` in `memory/impl-spawn-state.md` BEFORE spawning the next agent.**

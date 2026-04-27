@@ -18,7 +18,8 @@ attachments: [followup-{repo}-{pr}.md]
 ## CRITICAL: Workspace Rules
 **EVERY bash block MUST start with:**
 ```bash
-SCRIPTS=/Users/kevinlin/clawOSS/scripts
+: "${CLAWOSS_PROJECT_DIR:?Set CLAWOSS_PROJECT_DIR to the ClawOSS project root}"
+SCRIPTS="$CLAWOSS_PROJECT_DIR/scripts"
 ```
 **ALL work MUST happen in `/tmp/clawoss-followup-{pr}-{timestamp}/`.** NEVER clone to `/tmp/{repo-name}/` or any other location outside the `clawoss-` prefix. Cleanup daemon deletes stale dirs — anything outside `/tmp/clawoss-*` escapes cleanup and wastes disk.
 
@@ -33,9 +34,9 @@ You have `web_search` and `web_fetch`. Before implementing any reviewer-requeste
 
 ## Skills — Load These Before Working
 You have skills available. **Read each SKILL.md file** with the `read` tool:
-1. **`~/clawOSS/workspace/skills/oss-pr-review-handler/SKILL.md`** — The full follow-up workflow. Read this FIRST.
-2. **`~/clawOSS/workspace/skills/verification-before-completion/SKILL.md`** — Verify your changes before pushing.
-3. **`~/clawOSS/workspace/skills/oss-review/SKILL.md`** — Self-review checklist before committing.
+1. **`$CLAWOSS_PROJECT_DIR/workspace/skills/oss-pr-review-handler/SKILL.md`** — The full follow-up workflow. Read this FIRST.
+2. **`$CLAWOSS_PROJECT_DIR/workspace/skills/verification-before-completion/SKILL.md`** — Verify your changes before pushing.
+3. **`$CLAWOSS_PROJECT_DIR/workspace/skills/oss-review/SKILL.md`** — Self-review checklist before committing.
 Load skills proactively — they have the exact classification logic and response patterns.
 
 ## Performance Standards — Rework Until It Works
@@ -80,7 +81,7 @@ This is MUCH better than a generic top-level "addressed feedback" comment. Maint
 
 1b. HEALTH GATE (defense-in-depth — skip follow-up if repo now fails health):
    ```bash
-   bash /Users/kevinlin/clawOSS/scripts/repo-health-check.sh {owner}/{repo}
+   bash "$SCRIPTS/repo-health-check.sh" {owner}/{repo}
    if [ $? -ne 0 ]; then
      echo "SKIP: repo {owner}/{repo} now fails health check — not worth following up"
      rm -rf $WORKDIR
@@ -123,7 +124,7 @@ This is MUCH better than a generic top-level "addressed feedback" comment. Maint
 
 10c. If maintainer says "already fixed" / "fixed in latest release" / "resolved upstream":
     ```bash
-    bash /Users/kevinlin/clawOSS/scripts/respond-to-review.sh {owner}/{repo} {pr} close-fixed
+    bash "$SCRIPTS/respond-to-review.sh" {owner}/{repo} {pr} close-fixed
     ```
     Mark as already_fixed_upstream. Do NOT argue or ask for merge anyway.
 
@@ -139,7 +140,7 @@ This is MUCH better than a generic top-level "addressed feedback" comment. Maint
     using the format defined in templates/subagent-result-schema.md
     If reviewer approved or gave positive feedback, update trust:
     ```bash
-    bash /Users/kevinlin/clawOSS/scripts/update-trust-repos.sh {owner}/{repo} promote
+    bash "$SCRIPTS/update-trust-repos.sh" {owner}/{repo} promote
     ```
 
 13. CLEANUP: rm -rf $WORKDIR
