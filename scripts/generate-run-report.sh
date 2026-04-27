@@ -148,8 +148,8 @@ budget = load_json(os.environ["_BUDGET_JSON"], {})
 
 cycles = load_json(memory_dir / "heartbeat-cycles.json", {})
 cycle_count = int(cycles.get("cycle_count") or 0)
-first_cycle = parse_time(cycles.get("first_cycle_at"))
-last_cycle = parse_time(cycles.get("last_cycle_at"))
+first_cycle = parse_time(cycles.get("first_cycle_at") or cycles.get("first_cycle"))
+last_cycle = parse_time(cycles.get("last_cycle_at") or cycles.get("last_cycle"))
 
 agent_status = overview.get("agentStatus") or {}
 stats = overview.get("stats") or {}
@@ -182,7 +182,9 @@ recent_prs = [
 ]
 
 dry_run_log = read_text(memory_dir / "dry-run-log.md")
-dry_run_steps = dry_run_log.count("PR creation skipped")
+dry_run_steps = len(
+    re.findall(r"PR creation skipped|Status:\s*SKIPPED\s*\(dry-run\)", dry_run_log, re.I)
+)
 
 failure_log = read_text(memory_dir / "failure-log.md")
 failure_reasons = []
