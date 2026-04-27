@@ -12,11 +12,12 @@
     "health": "bash scripts/health-check.sh",
     "dashboard:dev": "cd dashboard && npm run dev",
     "dashboard:build": "cd dashboard && npm run build",
+    "mvp:dry-run": "node scripts/mvp-runner.mjs --cycles 3",
     "validate": "node scripts/validate-config.mjs"
   },
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/breezeFur/ClawOSS.git"
+    "url": "https://github.com/onthebed/ClawOSS.git"
   }
 }
