@@ -13,6 +13,7 @@
     "dashboard:dev": "cd dashboard && npm run dev",
     "dashboard:build": "cd dashboard && npm run build",
     "mvp:dry-run": "node scripts/mvp-runner.mjs --cycles 3",
+    "mvp:verify-budget-pause": "bash scripts/verify-budget-pause.sh",
     "validate": "node scripts/validate-config.mjs"
   },
   "license": "MIT",
