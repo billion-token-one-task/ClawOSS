@@ -2,10 +2,11 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { db, ensureDb } from "@/lib/db";
-import { pullRequests, prReviews, agentLogs, heartbeats, metricsTokens } from "@/lib/schema";
+import { pullRequests, prReviews, agentLogs, heartbeats, metricsTokens, settings } from "@/lib/schema";
 import { eq, sql, gte, desc } from "drizzle-orm";
 import { preferAccurateMetrics } from "@/lib/metrics-source";
 import { computeBudgetStatus, extractRuntimeSnapshot } from "@/lib/runtime";
+import type { DashboardSettings } from "@/lib/types";
 
 /**
  * Hard blocklist — repos where submitting PRs risks bans or reputation damage.
@@ -58,6 +59,10 @@ export async function GET() {
     const metricRows = preferAccurateMetrics(
       await db.select().from(metricsTokens).orderBy(desc(metricsTokens.timestamp))
     );
+    const settingsRow = await db.query.settings.findFirst({
+      where: eq(settings.key, "dashboard_settings"),
+    });
+    const dashboardSettings = (settingsRow?.value || {}) as Partial<DashboardSettings>;
     const budget = computeBudgetStatus(
       runtime,
       metricRows.reduce(
@@ -68,7 +73,8 @@ export async function GET() {
           return acc;
         },
         { inputTokens: 0, outputTokens: 0, costUsd: 0 }
-      )
+      ),
+      Boolean(dashboardSettings.agentPaused)
     );
 
     // Basic stats
@@ -235,6 +241,7 @@ export async function GET() {
       healthy: directives.length === 0 && !budget.paused,
       pauseAgent: budget.paused,
       pauseReason: budget.pauseReason,
+      manuallyPaused: Boolean(dashboardSettings.agentPaused),
       budget,
       stats: {
         total,

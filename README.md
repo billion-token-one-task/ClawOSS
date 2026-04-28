@@ -41,12 +41,33 @@ An <a href="https://github.com/openclaw/openclaw">OpenClaw</a> agent that autono
 ### Quick Start
 
 ```bash
-git clone https://github.com/billion-token-one-task/ClawOSS.git
+git clone https://github.com/onthebed/ClawOSS.git
 cd ClawOSS
 cp .env.example .env   # edit with your API keys
 bash scripts/setup.sh
 bash scripts/restart.sh
 ```
+
+### Continuous Run MVP Dry-Run
+
+Use this path when validating the continuous-run MVP without creating a live PR:
+
+```bash
+cp .env.example .env   # fill model, GitHub, dashboard, and budget values
+npm run mvp:dry-run
+```
+
+The runner completes 3 heartbeat cycles by default, checks dashboard pause and budget guardrails before work, discovers candidate GitHub issues, applies CLA / duplicate / already-fixed / blocklist / avoidRepos filters, generates PR title/body/creation command, and writes a report under `reports/mvp-run-*.md`.
+`CLAWOSS_MVP_DISCOVERY_REPOS` can be used to pin discovery to a controlled repo set during validation.
+
+Useful options:
+
+```bash
+node scripts/mvp-runner.mjs --cycles 3 --max-candidates 20
+node scripts/mvp-runner.mjs --cycles 3 --issue owner/repo#123
+```
+
+If `/api/agent/health-check` returns `pauseAgent: true` or `budget.paused: true`, the runner stops before spawning, commenting, pushing, or preparing PR creation.
 
 ---
 
@@ -125,7 +146,7 @@ bash scripts/restart.sh
 ░            ▼                    ▼                       ▼                       ░
 ░  ┌─────────────────┐ ┌──────────────────┐  ┌──────────────────────┐            ░
 ░  │  GitHub          │ │  Vercel Dashboard │  │  Telemetry Hooks     │            ░
-░  │  (BillionClaw)   │ │  /api/ingest/*    │  │  dashboard-reporter  │            ░
+░  │  (configured user)│ │  /api/ingest/*    │  │  dashboard-reporter  │            ░
 ░  │                  │ │                   │  │  audit-logger         │            ░
 ░  │  PRs · Commits   │ │  heartbeat        │  │  pii-sanitizer       │            ░
 ░  │  Reviews         │ │  metrics          │  │  dashboard-sync.sh   │            ░
@@ -316,7 +337,7 @@ The `plugins/pii-sanitizer/index.js` (101 lines) performs bidirectional `@` swap
 ░                                                                             ░
 ░  pr-ledger-sync.sh (185 lines) — runs every 60s via launchd                 ░
 ░  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄                            ░
-░  Source 1: gh search prs --author BillionClaw --limit 200                    ░
+░  Source 1: gh search prs --author "$GITHUB_USERNAME" --limit 200             ░
 ░  Source 2: grep subagent-result-*.md for PR URLs                             ░
 ░  Python merger: pr_map keyed by URL, GH is authoritative for status          ░
 ░  Result files fill in issue numbers, existing ledger preserves mappings      ░
@@ -377,7 +398,7 @@ The `plugins/pii-sanitizer/index.js` (101 lines) performs bidirectional `@` swap
 ░ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ░
 ░                                                                             ░
 ░  Step  1  ░░   source .env                                                  ░
-░  Step  2  ░░░  git config user.name BillionClaw                             ░
+░  Step  2  ░░░  git config user.name "$GITHUB_USERNAME"                      ░
 ░  Step  3  ░░░░ gh auth login --with-token                                   ░
 ░  Step  4  ▒▒▒▒ ln -sf workspace → ~/.openclaw/workspace                    ░
 ░  Step  5  ▒▒▒▒▒ sed __WORKSPACE_PATH__ → deploy config                     ░
@@ -441,7 +462,7 @@ clawOSS/
     ├── AGENTS.md ················ 163 lines — prime directive + rules
     ├── HEARTBEAT.md ············· 244 lines — 8-step autonomous loop
     ├── SOUL.md ·················· persona, tone, boundaries
-    ├── IDENTITY.md ·············· @BillionClaw
+    ├── IDENTITY.md ·············· configured GitHub identity
     ├── USER.md ·················· operator profile
     ├── hooks/
     │   ├── dashboard-reporter/ ·· 628 lines — telemetry to Vercel
