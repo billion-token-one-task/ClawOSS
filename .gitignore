@@ -56,3 +56,22 @@ dashboard/demo-local.db.bak-*
 .idea/
 tmp/
 208184
+
+# Local agent/runtime artifacts
+/memory/
+/workspace/.work/
+/workspace/.sync-state/
+/workspace/*.bak
+/workspace/*.swp
+/workspace/tmp_*.py
+/workspace/tmp_*.json
+/workspace/[0-9]*
+/workspace/=*
+/workspace/{*}
+/workspace/railwayapp-cli/
+/workspace/subagent-implementation.md
+/reports/mvp-run-*.json
+/reports/mvp-run-*.md
+
+# Generated local service units may contain machine paths or secrets
+/config/systemd/dashboard-sync.service
