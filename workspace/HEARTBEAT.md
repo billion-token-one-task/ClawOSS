@@ -3,6 +3,10 @@
 ## CRITICAL: NEVER REPLY HEARTBEAT_OK — ALWAYS WORK
 There is ALWAYS something to do. Execute ALL steps 0-7 every cycle. If queue is empty, run discovery. If discovery finds nothing, expand to new niches. If no new issues, follow up on open PRs. If truly nothing: search broader (lower star threshold, older issues, new languages). The agent must NEVER be idle.
 
+## ABSOLUTE STOP: Dashboard Pause and Budget Guardrail
+`pauseAgent=true`, dashboard manual pause, or exhausted token/cost budget has higher priority than every work directive in this file, including NEVER idle / ALWAYS work.
+At the start of every cycle and before any comment, branch push, subagent spawn, or PR creation, call `${CLAWOSS_HEALTHCHECK_URL:-${DASHBOARD_URL:-https://clawoss-dashboard.vercel.app}/api/agent/health-check}`. If it returns `pauseAgent: true` or `budget.paused: true`, stop submitting, stop spawning, log the pause reason, update dashboard state if possible, and do not resume until the dashboard/budget guardrail clears.
+
 ## Rules — see AGENTS.md (loaded alongside this file)
 Keep all 10 impl/followup sub-agent slots filled. **NEW PRs FIRST** — fill all 10 slots with new implementations. Only do follow-ups AFTER all 10 impl slots are full or no new work exists.
 Work queue should have 10+ items. If < 5, run oss-discover IMMEDIATELY.
@@ -43,9 +47,10 @@ Skills: `$CLAWOSS_WORKSPACE_DIR/skills/{name}/SKILL.md`. Load with `read`.
 - **API error backoff**: If 3+ API calls fail in a row (rate limit, 403, 5xx), pause 60 seconds before continuing. If 5+ fail, skip to step 7 cleanup and self-wake — never fully stop.
 **0c. Dashboard self-check** (run every cycle, skip if dashboard unreachable):
 ```bash
-HEALTH=$(curl -s --max-time 5 https://clawoss-dashboard.vercel.app/api/agent/health-check)
+HEALTH=$(curl -s --max-time 5 "${CLAWOSS_HEALTHCHECK_URL:-${DASHBOARD_URL:-https://clawoss-dashboard.vercel.app}/api/agent/health-check}")
 ```
 Parse the response and OBEY all three fields:
+- `pauseAgent` / `budget.paused`: STOP immediately. Do not spawn subagents, comment, push, or create PRs. This overrides all NEVER idle / ALWAYS work text.
 - `directives`: plain-English corrections (slow down, follow up first, avoid dead repos). Read and follow.
 - `avoidRepos`: repos with 2+ PRs and 0 merges — do NOT submit NEW PRs to any of these. But NEVER kill in-progress subagents working on these repos. Let them finish — killing mid-flight wastes the work already done.
 - `reposWithOpenPRs`: repos where we already have open PRs — do NOT submit new PRs, focus on follow-ups instead.
@@ -93,7 +98,7 @@ Count active impl/followup sub-agents (sessions_list, exclude main + always-on s
 - **impl/followup active >= 10**: skip to step 6. **Do NOT say "monitoring for completion events" and stop.** Always continue to step 6, then 7, then self-wake and loop back.
 - **impl/followup active < 10, queue has items**: pick next (urgent first, P(merge) >= 30, score >= 5). Gates:
   a. **IMPL SPAWN GUARD**: skip if issue has `spawned_pending` in `memory/impl-spawn-state.md`.
-  b. **DEDUP**: skip if in pr-ledger.md, in subagent-result-*.md, repo has `spawned_pending` in impl-spawn-state.md, OR lock file exists (`memory/locks/{owner}_{repo}.lock`). ALWAYS use the configured GitHub username explicitly — `@me` can fail in sub-agent contexts.
+  b. **DEDUP**: skip if in pr-ledger.md, in subagent-result-*.md, repo has `spawned_pending` in impl-spawn-state.md, OR lock file exists (`memory/locks/{owner}_{repo}.lock`). ALWAYS use `${CLAW_AGENT_USERNAME:-${GITHUB_USERNAME:-clawoss-agent}}` explicitly — `@me` can fail in sub-agent contexts.
   **DOUBLE-CHECK**: Before each spawn, re-run `gh search prs --author "${CLAW_AGENT_USERNAME:-${GITHUB_USERNAME:-clawoss-agent}}" --repo {owner}/{repo} --state open --json number --jq 'length'`. If count changed, skip (race condition guard).
   **LOCK FILE**: Before spawning, write lock: `echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) {issue}" > memory/locks/{owner}_{repo}.lock`. Sub-agent deletes lock after PR creation or failure. Orchestrator cleans stale locks (>30 minutes) in step 1 (stall recovery).
   b2. **BLOCKLIST HARD-BLOCK**: Read `memory/trust-repos.md` Deprioritized section. If the repo appears there AND `Skip Until` is "permanent" or a future date, SKIP unconditionally — no override by score, labels, or any other factor. Repos on this list have hostile maintainers, ban threats, or non-automatable CLAs.
@@ -134,7 +139,7 @@ Count active impl/followup sub-agents (sessions_list, exclude main + always-on s
 **5a. Pre-spawn comment (score >= 8, or >= 6 for trusted repos):** Post brief comment: `gh issue comment {issue} --repo {owner}/{repo} --body "Looking into this — [1-sentence approach]. Happy to submit a fix."` Skip for lower scores.
 **5b.** Use the `read` tool to load `templates/subagent-implementation.md` from disk NOW (do NOT reuse cached content). Substitute `{repo}`, `{issue}`, `{title}` in the content. Spawn: `sessions_spawn(task: {THE_SUBSTITUTED_CONTENT}, label: "{repo}#{issue}", ...)`. Always re-read the template for EVERY spawn — files change between cycles. Pass repo conventions + issue details as attachments.
 **IMMEDIATELY mark issue as `spawned_pending` in `memory/impl-spawn-state.md` BEFORE spawning the next agent.**
-**NEVER use `@me` — it fails in sub-agent contexts. ALWAYS use the configured GitHub username explicitly.**
+**NEVER use `@me` — it fails in sub-agent contexts. ALWAYS use `${CLAW_AGENT_USERNAME:-${GITHUB_USERNAME:-clawoss-agent}}` explicitly.**
 **Read `memory/repos/{owner}_{repo}.md`** if it exists — pass key info (target branch, CLA, CI) to the subagent via attachments.
 **5c. PASS OPEN PR CONTEXT**: Before spawning, fetch open PRs in the repo and pass as attachment:
 `gh pr list --repo {owner}/{repo} --state open --json number,title,headRefName --limit 20`

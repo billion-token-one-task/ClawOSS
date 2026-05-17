@@ -17,9 +17,9 @@ runTimeoutSeconds: 0
 ## CRITICAL: Script Path
 **EVERY bash block MUST start with this line:**
 ```bash
-SCRIPTS=/Users/kevinlin/clawOSS/scripts
+SCRIPTS="$CLAWOSS_PROJECT_DIR/scripts"
 ```
-All ClawOSS utility scripts are at this absolute path. You run in /tmp — relative paths WILL NOT WORK.
+All ClawOSS utility scripts are resolved from the configured project root. You run in /tmp — relative paths WILL NOT WORK.
 
 ## Task Prompt
 
