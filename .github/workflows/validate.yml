@@ -2,9 +2,9 @@ name: Validate
 
 on:
   push:
-    branches: [main]
+    branches: [main, "alpha/**"]
   pull_request:
-    branches: [main]
+    branches: [main, "alpha/**"]
 
 jobs:
   validate-config:
@@ -17,8 +17,12 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Validate openclaw.json
-        run: node -e "JSON.parse(require('fs').readFileSync('config/openclaw.json', 'utf8'))"
+      # openclaw.json uses __PLACEHOLDER__ tokens that are substituted by
+      # restart.sh / deploy/docker/entrypoint.sh. validate-config.mjs below
+      # runs the full post-substitution parse. This inline check just sanity-
+      # asserts the file exists and isn't empty.
+      - name: Ensure openclaw.json is present
+        run: test -s config/openclaw.json
 
       - name: Validate cron-jobs.json
         run: node -e "JSON.parse(require('fs').readFileSync('config/cron-jobs.json', 'utf8'))"

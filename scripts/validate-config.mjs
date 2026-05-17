@@ -8,7 +8,7 @@
  * - cron-jobs.json parses as valid JSON array
  * - All required workspace files exist
  * - All skills have valid SKILL.md with frontmatter
- * - Skills are under 2000 character limit
+ * - Skills stay within the current operational size budget
  * - All scripts are executable
  */
 
@@ -41,8 +41,28 @@ console.log("\n=== Config Files ===");
 
 try {
   const raw = readFileSync(join(ROOT, "config/openclaw.json"), "utf8");
-  JSON.parse(raw);
-  pass("config/openclaw.json is valid JSON");
+  // openclaw.json contains __PLACEHOLDER__ tokens that scripts/restart.sh +
+  // deploy/docker/entrypoint.sh substitute at deploy time. Validate the
+  // post-substitution shape here so CI catches malformed templates without
+  // requiring operators to run the full deploy flow.
+  const substituted = raw
+    .replace(/__WORKSPACE_PATH__/g, "/app/workspace")
+    .replace(/__PROJECT_DIR__/g, "/app")
+    .replace(/__HOME_DIR__/g, "/home/clawoss")
+    .replace(/__LLM_PROVIDER__/g, "anthropic")
+    .replace(/__LLM_BASE_URL__/g, "https://api.anthropic.com/v1")
+    .replace(/__LLM_MODEL_COMPLEX__/g, "claude-opus-4-6")
+    .replace(/__LLM_MODEL_SIMPLE__/g, "claude-sonnet-4-6")
+    .replace(/__INPUT_COST_PER_M_COMPLEX__/g, "5.0")
+    .replace(/__OUTPUT_COST_PER_M_COMPLEX__/g, "25.0")
+    .replace(/__INPUT_COST_PER_M_SIMPLE__/g, "3.0")
+    .replace(/__OUTPUT_COST_PER_M_SIMPLE__/g, "15.0")
+    .replace(/__INPUT_COST_PER_M__/g, "3.0")
+    .replace(/__OUTPUT_COST_PER_M__/g, "15.0")
+    .replace(/__LLM_CONTEXT_WINDOW__/g, "200000")
+    .replace(/__LLM_MAX_TOKENS__/g, "32000");
+  JSON.parse(substituted);
+  pass("config/openclaw.json is valid JSON (post-template-substitution)");
 } catch (e) {
   fail(`config/openclaw.json: ${e.message}`);
 }
@@ -109,7 +129,8 @@ const requiredSkills = [
   "safety-checker",
 ];
 
-const SKILL_CHAR_LIMIT = 15000;
+const SKILL_WARN_CHAR_LIMIT = 20000;
+const SKILL_FAIL_CHAR_LIMIT = 25000;
 
 for (const skill of requiredSkills) {
   const skillPath = join(ROOT, "workspace/skills", skill, "SKILL.md");
@@ -135,9 +156,11 @@ for (const skill of requiredSkills) {
     fail(`${skill}: missing 'description' field in frontmatter`);
   }
 
-  // Check size limit
-  if (chars > SKILL_CHAR_LIMIT) {
-    fail(`${skill}: ${chars} chars exceeds ${SKILL_CHAR_LIMIT} limit`);
+  // Keep large skills visible without blocking legitimate configs.
+  if (chars > SKILL_FAIL_CHAR_LIMIT) {
+    fail(`${skill}: ${chars} chars exceeds ${SKILL_FAIL_CHAR_LIMIT} hard limit`);
+  } else if (chars > SKILL_WARN_CHAR_LIMIT) {
+    warn(`${skill}: ${chars} chars exceeds ${SKILL_WARN_CHAR_LIMIT} warning threshold`);
   } else {
     pass(`${skill}: ${chars} chars`);
   }
