@@ -9,26 +9,54 @@ interface AgentStatusCardProps {
 }
 
 export function AgentStatusCard({ status }: AgentStatusCardProps) {
+  const tone = status.isPaused
+    ? {
+        dot: "bg-amber-500",
+        ping: "bg-amber-500",
+        text: "text-amber-400/80",
+        label: "paused",
+      }
+    : status.isOnline
+      ? {
+          dot: "bg-emerald-500",
+          ping: "bg-emerald-500",
+          text: "text-emerald-400/80",
+          label: "online",
+        }
+      : {
+          dot: "bg-red-500",
+          ping: "bg-red-500",
+          text: "text-red-400/80",
+          label: "offline",
+        };
+
   return (
     <Card className="accent-top corner-brackets card-elevated">
       <CardContent className="p-5">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2.5 font-mono text-xs">
             <span className="relative flex h-2.5 w-2.5">
-              {status.isOnline && (
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-50" />
+              {(status.isOnline || status.isPaused) && (
+                <span className={`absolute inline-flex h-full w-full animate-ping rounded-full ${tone.ping} opacity-50`} />
               )}
-              <span className={`relative h-2.5 w-2.5 rounded-full ${status.isOnline ? "bg-emerald-500" : "bg-red-500"}`} />
+              <span className={`relative h-2.5 w-2.5 rounded-full ${tone.dot}`} />
             </span>
             <span className="stat-label">Agent</span>
-            <span className={`font-medium ${status.isOnline ? "text-emerald-400/80" : "text-red-400/80"}`}>
-              {status.isOnline ? "online" : "offline"}
+            <span className={`font-medium ${tone.text}`}>
+              {tone.label}
             </span>
           </div>
-          {status.isOnline && (
-            <span className="text-[9px] font-mono text-emerald-500/40 uppercase tracking-widest">active</span>
+          {(status.isOnline || status.isPaused) && (
+            <span className={`text-[9px] font-mono uppercase tracking-widest ${status.isPaused ? "text-amber-500/50" : "text-emerald-500/40"}`}>
+              {status.isPaused ? "budget-stop" : "active"}
+            </span>
           )}
         </div>
+        {status.pauseReason && (
+          <div className="mb-4 rounded-md border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-[11px] font-mono text-amber-300/80">
+            {status.pauseReason}
+          </div>
+        )}
         <div className="grid grid-cols-3 gap-6 font-mono">
           <div>
             <div className="stat-label">Uptime</div>

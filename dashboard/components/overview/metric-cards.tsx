@@ -17,10 +17,24 @@ interface MetricCardsProps {
   inputTokensToday: number;
   outputTokensToday: number;
   costToday: number;
+  runtimeLabel?: string | null;
   funnel?: FunnelData;
   costPerMerge?: number;
   tokensPerMerge?: number;
   avgHoursToReview?: number | null;
+  budget?: {
+    tokenBudgetTotal: number | null;
+    costBudgetUsdTotal: number | null;
+    usedTokensTotal: number;
+    usedCostTotalUsd: number;
+    remainingTokens: number | null;
+    remainingCostUsd: number | null;
+    tokenUsagePercent: number | null;
+    costUsagePercent: number | null;
+    exhausted: boolean;
+    paused: boolean;
+    pauseReason: string | null;
+  };
 }
 
 function MiniBar({
@@ -105,10 +119,12 @@ export function MetricCards({
   inputTokensToday,
   outputTokensToday,
   costToday,
+  runtimeLabel,
   funnel,
   costPerMerge,
   tokensPerMerge,
   avgHoursToReview,
+  budget,
 }: MetricCardsProps) {
   const mergeColor =
     mergeRate >= 50
@@ -118,6 +134,23 @@ export function MetricCards({
         : mergeRate > 0
           ? "text-red-400"
           : "text-muted-foreground/40";
+
+  const budgetPercent =
+    budget?.tokenUsagePercent ?? budget?.costUsagePercent ?? null;
+  const tokenBudgetTotal = budget?.tokenBudgetTotal ?? null;
+  const costBudgetUsdTotal = budget?.costBudgetUsdTotal ?? null;
+  const budgetBarColor =
+    budget?.exhausted
+      ? "bg-red-500/50"
+      : (budgetPercent ?? 0) >= 80
+        ? "bg-amber-500/40"
+        : "bg-emerald-500/40";
+  const budgetSub =
+    tokenBudgetTotal != null
+      ? `${formatTokens(budget?.usedTokensTotal || 0)} / ${formatTokens(tokenBudgetTotal)}`
+      : costBudgetUsdTotal != null
+        ? `${formatCost(budget?.usedCostTotalUsd || 0)} / ${formatCost(costBudgetUsdTotal)}`
+        : budget?.pauseReason || "no cap";
 
   const cards = [
     {
@@ -137,7 +170,7 @@ export function MetricCards({
     {
       label: "Cost/24h",
       value: formatCost(costToday),
-      sub: costToday > 0 ? "kimi k2.5" : null,
+      sub: runtimeLabel || null,
       bar: { value: costToday, max: 5 },
     },
     {
@@ -163,7 +196,18 @@ export function MetricCards({
         ? "bg-emerald-500/40"
         : avgHoursToReview != null && avgHoursToReview <= 72
           ? "bg-amber-500/40"
-          : "bg-red-500/40",
+        : "bg-red-500/40",
+    },
+    {
+      label: "Budget",
+      value: budget?.paused
+        ? "paused"
+        : budgetPercent != null
+          ? `${budgetPercent.toFixed(1)}%`
+          : "--",
+      sub: budgetSub,
+      bar: { value: budgetPercent || 0, max: 100 },
+      barColor: budgetBarColor,
     },
   ];
 
@@ -307,7 +351,7 @@ export function MetricCards({
       </div>
 
       {/* Secondary metrics */}
-      <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-7">
         {cards.map((card) => (
           <Card key={card.label} className="metric-card card-lift">
             <CardContent className="p-4 pb-3">

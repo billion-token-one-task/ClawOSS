@@ -11,6 +11,8 @@ let _lastPrune = 0;
 let _lastSync = 0;
 
 const VALID_STATUSES = ["alive", "degraded", "offline"] as const;
+const AUTO_GITHUB_SYNC =
+  process.env.CLAWOSS_DASHBOARD_AUTO_GITHUB_SYNC === "true";
 
 export async function POST(request: Request) {
   if (!validateApiKey(request)) return unauthorizedResponse();
@@ -55,8 +57,11 @@ export async function POST(request: Request) {
       );
     }
 
-    // GitHub PR sync: sync PRs at most once every 5 minutes
-    if (now - _lastSync > 300_000) {
+    // Optional GitHub PR sync: disabled by default for fresh deployments.
+    // Historical PR backfills can pollute a clean startup state and interfere
+    // with health-check routing. Use /api/github/sync manually, or set
+    // CLAWOSS_DASHBOARD_AUTO_GITHUB_SYNC=true to re-enable periodic syncing.
+    if (AUTO_GITHUB_SYNC && now - _lastSync > 300_000) {
       _lastSync = now;
       syncPRsFromGitHub().catch((err) =>
         console.error("[heartbeat] GitHub sync error:", err)

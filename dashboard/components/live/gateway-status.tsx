@@ -10,6 +10,10 @@ interface GatewayStatusProps {
   heartbeatsLastHour: number;
   errorsLastHour: number;
   sessions: ConversationSession[];
+  runtimeLabel?: string | null;
+  pricingLabel?: string | null;
+  heartbeatIntervalMinutes?: number;
+  budgetPaused?: boolean;
 }
 
 const SKILLS = [
@@ -35,6 +39,10 @@ export function GatewayStatus({
   heartbeatsLastHour,
   errorsLastHour,
   sessions,
+  runtimeLabel,
+  pricingLabel,
+  heartbeatIntervalMinutes = 5,
+  budgetPaused = false,
 }: GatewayStatusProps) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
@@ -100,7 +108,7 @@ export function GatewayStatus({
         </div>
         <div className="flex justify-between">
           <span className="stat-label">Model</span>
-          <span className="text-foreground/60">kimi-coding/k2p5</span>
+          <span className="text-foreground/60">{runtimeLabel || "unknown"}</span>
         </div>
         <div className="flex justify-between">
           <span className="stat-label">Auth</span>
@@ -108,7 +116,7 @@ export function GatewayStatus({
         </div>
         <div className="flex justify-between">
           <span className="stat-label">HB interval</span>
-          <span>10m</span>
+          <span>{heartbeatIntervalMinutes}m</span>
         </div>
         <div className="flex justify-between">
           <span className="stat-label">HBs/hr</span>
@@ -125,6 +133,12 @@ export function GatewayStatus({
         <div className="flex justify-between">
           <span className="stat-label">MaxConc</span>
           <span>5</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="stat-label">Pricing</span>
+          <span className={budgetPaused ? "text-red-400" : "text-foreground/60"}>
+            {pricingLabel || "n/a"}
+          </span>
         </div>
       </div>
 

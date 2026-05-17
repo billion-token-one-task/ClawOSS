@@ -5,7 +5,9 @@
 # Resets spawned_pending entries in state files
 # Exit 0 always, outputs JSON summary
 
-WORKSPACE_DIR="${WORKSPACE_DIR:-/Users/kevinlin/clawOSS/workspace}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="${CLAWOSS_PROJECT_DIR:-$(dirname "$SCRIPT_DIR")}"
+WORKSPACE_DIR="${WORKSPACE_DIR:-${CLAWOSS_WORKSPACE_DIR:-$PROJECT_DIR/workspace}}"
 LOCK_DIR="${WORKSPACE_DIR}/memory/locks"
 IMPL_STATE="${WORKSPACE_DIR}/memory/impl-spawn-state.md"
 FOLLOWUP_STATE="${WORKSPACE_DIR}/memory/pr-followup-state.md"
