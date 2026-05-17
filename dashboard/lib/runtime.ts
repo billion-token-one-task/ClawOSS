@@ -121,11 +121,11 @@ export function computeBudgetStatus(
 
   const tokenExceeded =
     tokenBudgetTotal != null && tokenBudgetTotal > 0
-      ? usedTokensTotal >= tokenBudgetTotal
+      ? usedTokensTotal > tokenBudgetTotal
       : false;
   const costExceeded =
     costBudgetUsdTotal != null && costBudgetUsdTotal > 0
-      ? usedCostTotalUsd >= costBudgetUsdTotal
+      ? usedCostTotalUsd > costBudgetUsdTotal
       : false;
 
   let pauseReason: string | null = null;
