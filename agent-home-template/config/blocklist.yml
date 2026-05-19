@@ -1,0 +1,50 @@
+# blocklist.yml — issues the agent must never touch.
+#
+# The Skill applies this in step 2 (filter). Each rule is OR'd; a candidate
+# matching ANY rule is dropped. Conservative defaults below — only loosen
+# after you've watched the agent for several cycles.
+
+schema_version: 1
+
+# Labels (case-insensitive) that exclude an issue outright.
+labels:
+  - security
+  - vulnerability
+  - cve
+  - sensitive
+  - needs-design
+  - blocked
+
+# Substrings searched in issue title (case-insensitive). Cheap signal —
+# overlaps with labels intentionally, since not all repos use labels.
+title_keywords:
+  - "cve-"
+  - "security"
+  - "vuln"
+  - "exploit"
+  - "breaking change"
+  - "rfc:"
+
+# File globs the implementation step must not touch. If the Skill's planned
+# diff intersects any of these, the cycle aborts with `scope_too_large` and
+# escalates to human review.
+file_patterns:
+  - "**/secrets/**"
+  - "**/.env*"
+  - "**/credentials*"
+  - "**/auth/**"
+  - "**/security/**"
+  - "**/*.pem"
+  - "**/*.key"
+
+# Specific issues to never engage with, even if labels/keywords pass.
+# Format: "owner/repo#N" (one per line). The Skill matches exact.
+issues:
+  []
+  # - "example/repo#123"
+
+# Maintainers you have explicitly been asked not to interact with.
+# The Skill drops any candidate whose issue author or last-commenter is here.
+maintainers:
+  []
+  # - "@example-user"

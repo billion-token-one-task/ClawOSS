@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "_schema_doc": "Single source of truth for cost & ROI KPIs. The Skill rewrites this file at end of cycle. `cost_per_merged_pr_usd` is null when merged_pr_count == 0. Currency is always USD; the field stays explicit so future multi-currency support is a non-breaking change.",
+  "currency": "USD",
+  "budget_total_usd": 0,
+  "spent_usd": 0,
+  "merged_pr_count": 0,
+  "opened_pr_count": 0,
+  "cost_per_merged_pr_usd": null,
+  "last_cycle_id": null,
+  "last_updated_utc": null
+}

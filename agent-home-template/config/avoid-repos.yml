@@ -1,0 +1,26 @@
+# avoid-repos.yml — repos the agent must never discover into.
+#
+# The Skill consults this BEFORE step 1 (discover) — listed repos never even
+# hit the candidate pool. Use this instead of `blocklist.yml` when you want
+# to skip a whole repo, not a class of issues.
+#
+# Reasons to add a repo here:
+#   - Too large / hostile to small drive-by PRs (e.g. very-high-traffic repos)
+#   - Mid-rewrite — your PR will be invalidated by the in-flight refactor
+#   - Personal or commercial conflict of interest
+#   - Maintainer has asked you (or the agent's account) to stop
+
+schema_version: 1
+
+repos:
+  []
+  # - huggingface/transformers
+  # - openssl/openssl
+  # - torvalds/linux
+
+# Free-form notes per repo. The Skill never reads this section; it exists so
+# you can answer "why is X on the list" six months later.
+notes: |
+  # huggingface/transformers — too large for low-context drive-bys; v1.0 PR #2
+  #   reported maintainer pushback on minor agent-authored fixes.
+  # openssl/openssl — security-critical, blanket avoid.

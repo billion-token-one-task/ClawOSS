@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "_schema_doc": "Append-only ledger of every cycle attempt. The Skill must never rewrite or delete prior entries — `git log` of this file is the audit trail. A cycle without `ended_at` means the cycle crashed; recovery logic in SKILL.md handles it. Outcomes: pr_opened | no_candidate | budget_exhausted | scope_too_large | setup_error | needs_human_review | aborted_crash.",
+  "cycles": [
+    {
+      "_example": true,
+      "_note": "Reference shape only — delete this entry after the first real cycle.",
+      "cycle_id": "0000-00-00T00:00:00Z",
+      "started_at_utc": "0000-00-00T00:00:00Z",
+      "ended_at_utc": "0000-00-00T00:00:00Z",
+      "phase": "commit_state",
+      "outcome": "pr_opened",
+      "target_repo": "owner/name",
+      "target_issue": 0,
+      "pr_url": "https://github.com/owner/name/pull/0",
+      "branch": "clawoss/name-0",
+      "cost_usd": 0.0,
+      "notes": ""
+    }
+  ]
+}
